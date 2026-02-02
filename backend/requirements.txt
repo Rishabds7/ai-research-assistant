@@ -1,0 +1,37 @@
+# Django & REST Framework
+Django==4.2.10
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+django-environ==0.11.2
+
+# Database
+psycopg2-binary==2.9.9
+pgvector==0.2.4
+
+# Celery & Redis
+celery==5.3.6
+redis==5.0.1
+django-celery-results==2.5.1
+
+# PDF Processing
+PyMuPDF==1.23.26
+
+# Embeddings & ML
+sentence-transformers==2.3.1
+torch==2.8.0
+numpy==1.24.3
+
+# LLM Integration
+google-generativeai==0.3.2
+requests==2.31.0
+
+# Excel Export
+openpyxl==3.1.2
+pandas==2.2.0
+
+# Utilities
+python-dotenv==1.0.1
+pillow==10.2.0
+
+# Development
+ipython==8.18.1
