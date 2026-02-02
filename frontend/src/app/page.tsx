@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getPapers, uploadPaper, Paper } from "@/lib/api";
+import { getPapers, uploadPaper, Paper, deleteAllPapers } from "@/lib/api";
 import { PaperItem } from "@/components/PaperItem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"; // We'll use standard input for file upload
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, UploadCloud } from "lucide-react";
+import { Loader2, UploadCloud, Trash2 } from "lucide-react";
 import { useTaskPoll } from "@/hooks/useTaskPoll";
 
 export default function Home() {
@@ -53,6 +53,18 @@ export default function Home() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (confirm("Are you sure you want to delete ALL papers? This action cannot be undone.")) {
+      try {
+        await deleteAllPapers();
+        fetchPapers();
+      } catch (e) {
+        console.error("Failed to delete all papers", e);
+        alert("Failed to delete all papers");
+      }
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-5xl mx-auto space-y-8">
@@ -63,6 +75,17 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
+            {papers.length > 0 && (
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAll}
+                className="bg-red-50 hover:bg-red-100 text-red-600 border-red-100"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete All
+              </Button>
+            )}
+
             {/* Upload Button Wrapper */}
             <div className="relative">
               <input

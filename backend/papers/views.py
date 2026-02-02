@@ -107,6 +107,14 @@ class PaperViewSet(viewsets.ModelViewSet):
         )
         return Response({'task_id': task.id})
 
+    @action(detail=False, methods=['post'])
+    def delete_all(self, request):
+        """Delete all papers and associated data."""
+        Paper.objects.all().delete()
+        TaskStatus.objects.all().delete()
+        GapAnalysis.objects.all().delete()
+        return Response({'status': 'all papers and data deleted'}, status=status.HTTP_200_OK)
+
 class GapAnalysisView(views.APIView):
     def post(self, request):
         paper_ids = request.data.get('paper_ids', [])
