@@ -1,4 +1,6 @@
-# Research Paper Analysis Tool
+# Research Assistant MVP (AI Analysis Tool)
+**Status:** Multi-feature development in progress (Summarization, Dataset Extraction, Git Integration)
+*Last Updated: February 2026*
 
 MVP for analyzing research papers: upload PDFs, extract methodologies (RAG), identify research gaps, and generate comparison tables.
 
