@@ -18,7 +18,7 @@ class PaperListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Paper
-        fields = ['id', 'filename', 'file', 'uploaded_at', 'processed', 'methodology', 'section_summaries', 'metadata', 'task_ids']
+        fields = ['id', 'filename', 'file', 'uploaded_at', 'processed', 'methodology', 'section_summaries', 'metadata', 'task_ids', 'title', 'authors', 'notes', 'global_summary']
 
 class PaperDetailSerializer(serializers.ModelSerializer):
     methodology = MethodologySerializer(read_only=True)
@@ -26,7 +26,7 @@ class PaperDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Paper
-        fields = ['id', 'filename', 'file', 'uploaded_at', 'processed', 'full_text', 'sections', 'methodology', 'section_summaries', 'metadata', 'task_ids']
+        fields = ['id', 'filename', 'file', 'uploaded_at', 'processed', 'full_text', 'sections', 'methodology', 'section_summaries', 'metadata', 'task_ids', 'title', 'authors', 'notes', 'global_summary']
         extra_kwargs = {
             'filename': {'read_only': True}
         }

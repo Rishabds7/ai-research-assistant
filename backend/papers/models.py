@@ -23,6 +23,12 @@ class Paper(models.Model):
     metadata = models.JSONField(default=dict, blank=True)
     task_ids = models.JSONField(default=dict, blank=True) # {"summarize": "...", "datasets": "...", "licenses": "..."}
     
+    # New fields for Title, Authors, and Notes
+    title = models.CharField(max_length=500, blank=True)
+    authors = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    global_summary = models.TextField(blank=True)
+    
     class Meta:
         ordering = ['-uploaded_at']
     

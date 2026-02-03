@@ -239,64 +239,87 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                         </div>
                     </div>
                 )}
-                {/* Status Indicators & Metadata Snippets */}
-                <div className="flex flex-wrap gap-4 text-xs text-slate-500 mb-4 border-b pb-3">
-                    <div className="flex items-center gap-1">
-                        Processed: {paper.processed ? <CheckCircle2 className="h-3 w-3 text-green-500" /> : '...'}
+
+                {/* Consolidated Metadata Section */}
+                <div className="border-t pt-4 mt-2 space-y-4">
+                    {/* Status Row */}
+                    <div className="flex flex-wrap gap-4 text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                        <div className="flex items-center gap-1.5">
+                            Status: {paper.processed ? (
+                                <span className="flex items-center gap-1 text-green-600 font-bold">
+                                    <CheckCircle2 className="h-3 w-3" /> Ready
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1 text-blue-500 font-bold italic animate-pulse">
+                                    <Loader2 className="h-3 w-3 animate-spin" /> Analyzing
+                                </span>
+                            )}
+                        </div>
+                        {paper.metadata?.datasets && paper.metadata.datasets.length > 0 && (
+                            <div className="flex items-center gap-1 text-blue-600 font-bold">
+                                <Database className="h-3 w-3" />
+                                {(paper.metadata.datasets[0] === "None mentioned" || paper.metadata.datasets[0] === "Not Available / Present") ? 0 : paper.metadata.datasets.length} Datasets
+                            </div>
+                        )}
+                        {paper.metadata?.licenses && paper.metadata.licenses.length > 0 && (
+                            <div className="flex items-center gap-1 text-purple-600 font-bold">
+                                <Award className="h-3 w-3" />
+                                {(paper.metadata.licenses[0] === "None mentioned" || paper.metadata.licenses[0] === "Not Available / Present") ? 0 : paper.metadata.licenses.length} Licenses
+                            </div>
+                        )}
                     </div>
-                    {paper.metadata?.datasets && paper.metadata.datasets.length > 0 && (
-                        <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                            <Database className="h-3 w-3" />
-                            {(paper.metadata.datasets[0] === "None mentioned" || paper.metadata.datasets[0] === "Not Available / Present") ? 0 : paper.metadata.datasets.length} Datasets
-                        </div>
-                    )}
-                    {paper.metadata?.licenses && paper.metadata.licenses.length > 0 && (
-                        <div className="flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">
-                            <Award className="h-3 w-3" />
-                            {(paper.metadata.licenses[0] === "None mentioned" || paper.metadata.licenses[0] === "Not Available / Present") ? 0 : paper.metadata.licenses.length} Licenses
-                        </div>
-                    )}
-                    {/* Error Indicators */}
-                    {sumStatus === 'failed' && <div className="text-red-500 font-semibold border border-red-100 bg-red-50 px-2 py-0.5 rounded-full">Summary Failed</div>}
-                    {dsStatus === 'failed' && <div className="text-red-500 font-semibold border border-red-100 bg-red-50 px-2 py-0.5 rounded-full">Datasets Failed</div>}
-                    {licStatus === 'failed' && <div className="text-red-500 font-semibold border border-red-100 bg-red-50 px-2 py-0.5 rounded-full">Licenses Failed</div>}
-                </div>
 
+                    {/* Metadata Results (Simple Lists) - Only show if data exists */}
+                    {((paper.metadata?.datasets?.length ?? 0) > 0 || (paper.metadata?.licenses?.length ?? 0) > 0) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {paper.metadata?.datasets && paper.metadata.datasets.length > 0 && paper.metadata.datasets[0] !== "None mentioned" && (
+                                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">DATASETS:</h4>
+                                    <ul className="text-xs space-y-1">
+                                        {paper.metadata.datasets.map((d, i) => (
+                                            <li key={i} className="text-slate-700 font-medium">• {d}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {paper.metadata?.licenses && paper.metadata.licenses.length > 0 && paper.metadata.licenses[0] !== "None mentioned" && (
+                                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">LICENSES:</h4>
+                                    <ul className="text-xs space-y-1">
+                                        {paper.metadata.licenses.map((l, i) => (
+                                            <li key={i} className="text-slate-700 font-medium">• {l}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
-                {/* Metadata Results (Simple Lists) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    {paper.metadata?.datasets && paper.metadata.datasets.length > 0 && (
-                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                <Database className="h-3 w-3" /> Extracted Datasets
-                            </h4>
-                            <ul className="text-sm space-y-1">
-                                {paper.metadata.datasets.length === 1 && (paper.metadata.datasets[0] === "None mentioned" || paper.metadata.datasets[0] === "Not mentioned") ? (
-                                    <li className="text-slate-400 italic font-normal">None mentioned</li>
-                                ) : (
-                                    paper.metadata.datasets.map((d, i) => (
-                                        <li key={i} className="text-slate-800 font-semibold">• {d}</li>
-                                    ))
-                                )}
-                            </ul>
+                    {/* Title and Authors */}
+                    <div className="grid grid-cols-1 gap-4">
+                        <div className="space-y-1">
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">TITLE:</h4>
+                            <p className={`text-sm font-bold leading-tight ${(!paper.title || paper.title === "Unknown") ? "text-slate-400 italic" : "text-slate-900"}`}>
+                                {!paper.processed ? (
+                                    <span className="flex items-center gap-2 text-blue-500 italic font-medium">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Extracting from document...
+                                    </span>
+                                ) : (paper.title || "Not Available")}
+                            </p>
                         </div>
-                    )}
-                    {paper.metadata?.licenses && paper.metadata.licenses.length > 0 && (
-                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                <Award className="h-3 w-3" /> Licenses Mentioned
-                            </h4>
-                            <ul className="text-sm space-y-1">
-                                {paper.metadata.licenses.length === 1 && (paper.metadata.licenses[0] === "None mentioned" || paper.metadata.licenses[0] === "Not mentioned") ? (
-                                    <li className="text-slate-400 italic font-normal">No explicit licenses mentioned.</li>
-                                ) : (
-                                    paper.metadata.licenses.map((l, i) => (
-                                        <li key={i} className="text-slate-800 font-semibold">• {l}</li>
-                                    ))
-                                )}
-                            </ul>
+                        <div className="space-y-1">
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AUTHORS:</h4>
+                            <p className={`text-sm leading-tight ${(!paper.authors || paper.authors === "Unknown") ? "text-slate-400 italic" : "text-slate-700"}`}>
+                                {!paper.processed ? (
+                                    <span className="flex items-center gap-2 text-blue-500 italic font-medium">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Identifying researchers...
+                                    </span>
+                                ) : (paper.authors || "Not Available")}
+                            </p>
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* Section Summaries with Accordion */}

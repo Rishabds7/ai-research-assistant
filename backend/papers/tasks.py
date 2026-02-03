@@ -56,7 +56,28 @@ def process_pdf_task(self, paper_id):
         paper.full_text = sanitize_text(data['full_text'])
         paper.sections = sanitize_text(data['sections'])
         paper.processed = True
+        
+        # 2.5 Extract Title and Authors (Metadata)
+        logger.info(f"Starting metadata extraction for paper {paper_id}...")
+        try:
+            llm = LLMService()
+            # We take a slightly larger chunk (15k) to ensure we get the full title/author area
+            info = llm.extract_paper_info(paper.full_text[:15000])
+            
+            extracted_title = info.get('title', 'Unknown')
+            extracted_authors = info.get('authors', 'Unknown')
+            
+            logger.info(f"Metadata extracted for {paper_id}: Title='{extracted_title}', Authors='{extracted_authors}'")
+            
+            paper.title = sanitize_text(extracted_title)
+            paper.authors = sanitize_text(extracted_authors)
+        except Exception as e:
+            logger.error(f"Critical error during title/author extraction for {paper_id}: {e}")
+            if not paper.title: paper.title = "Unknown"
+            if not paper.authors: paper.authors = "Unknown"
+            
         paper.save()
+        logger.info(f"Paper {paper_id} saved successfully with processed=True and metadata.")
         
         # 3. Generate Embeddings
         embed_service = EmbeddingService()
@@ -135,22 +156,12 @@ def extract_all_sections_task(self, paper_id):
         paper = Paper.objects.get(id=paper_id)
         sections = paper.sections # already dict
         
-        if not sections:
-            # Maybe try to re-detect if empty?
-            pass
-            
+        # 0. Summarize Sections
         llm = LLMService()
         summaries = llm.smart_summarize_paper(paper.full_text, sections)
         
-        # Save to DB
-        # Re-verify paper exists to avoid IntegrityError if deleted mid-task
-        if not Paper.objects.filter(id=paper_id).exists():
-            logger.warning(f"Paper {paper_id} deleted during section extraction.")
-            return summaries
-
-        # Delete old summaries
+        # 1. Save Section Summaries (Core functionality)
         SectionSummary.objects.filter(paper=paper).delete()
-        
         new_summaries = []
         for i, (name, text) in enumerate(summaries.items()):
             new_summaries.append(
@@ -162,11 +173,23 @@ def extract_all_sections_task(self, paper_id):
                 )
             )
         SectionSummary.objects.bulk_create(new_summaries)
+
+        # 2. Generate and Save Global Summary if field exists
+        if hasattr(paper, 'global_summary'):
+            try:
+                global_sum = llm.generate_global_summary(summaries)
+                paper.global_summary = sanitize_text(global_sum)
+                paper.save(update_fields=['global_summary'])
+            except Exception as e:
+                logger.error(f"Error generating/saving global summary: {e}")
         
-        # Clear the task_id from Paper model
-        if 'summarize' in paper.task_ids:
-            del paper.task_ids['summarize']
-            paper.save(update_fields=['task_ids'])
+        # 3. Cleanup task status
+        try:
+            if 'summarize' in paper.task_ids:
+                del paper.task_ids['summarize']
+                paper.save(update_fields=['task_ids'])
+        except Exception:
+            pass
         
         update_task_status(task_id, 'completed', result=summaries)
         return summaries

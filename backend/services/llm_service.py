@@ -32,6 +32,8 @@ class LLMBackend(Protocol):
     def summarize_sections(self, sections: dict[str, str]) -> dict[str, str]: ...
     def extract_datasets(self, context: str) -> list[str]: ...
     def extract_licenses(self, context: str) -> list[str]: ...
+    def extract_paper_info(self, context: str) -> dict[str, str]: ...
+    def generate_global_summary(self, section_summaries: dict[str, str]) -> str: ...
 
 
 def _strip_json_markdown(raw: str) -> str:
@@ -448,6 +450,66 @@ JSON list:"""
         except Exception:
             return ["None mentioned"]
 
+    def extract_paper_info(self, context: str) -> dict[str, str]:
+        prompt = f"""You are a professional research assistant. Your task is to extract the EXACT title and the list of authors from the provided research paper text.
+        
+        INSTRUCTIONS:
+        1. The title is usually at the very beginning, in the largest font (represented here as the first few lines).
+        2. Authors usually follow immediately after the title.
+        3. Ignore affiliations (e.g., University names, emails, addresses).
+        4. If the title is split across multiple lines, combine it into a single coherent string.
+        5. The authors should be returned as a comma-separated list of names.
+        
+        Return ONLY valid JSON with this structure:
+        {{
+          "title": "Clean Full Paper Title",
+          "authors": "Author Name 1, Author Name 2, Author Name 3"
+        }}
+        
+        If you absolutely cannot find one of the fields, use "Unknown".
+
+        Text (First 10,000 characters):
+        ---
+        {context[:10000]}
+        ---
+        
+        JSON:"""
+        try:
+            response = self._generate_with_retry(prompt)
+            text = _get_response_text(response)
+            result = _parse_json_safe(text, {"title": "Unknown", "authors": "Unknown"})
+            if isinstance(result, dict):
+                return {
+                    "title": result.get("title", "Unknown"),
+                    "authors": result.get("authors", "Unknown")
+                }
+            return {"title": "Unknown", "authors": "Unknown"}
+        except Exception:
+            return {"title": "Unknown", "authors": "Unknown"}
+
+    def generate_global_summary(self, section_summaries: dict[str, str]) -> str:
+        # Flatten all section summaries into one text block
+        combined_text = "\n\n".join([f"### {name}\n{text}" for name, text in section_summaries.items()])
+        
+        prompt = f"""You are a research assistant. Based on the following section summaries of a research paper, provide a final global summary of the entire paper.
+        
+        STRICT RULES:
+        1. Return exactly 4 to 6 concise bullet points.
+        2. Focus on the core problem, methodology, key findings, and significance.
+        3. Do NOT include any preamble or meta-talk like "Here is a summary".
+        4. Start each bullet point with a "• ".
+        
+        Section Summaries:
+        {combined_text[:50000]}
+        
+        Global Summary:"""
+        
+        try:
+            response = self._generate_with_retry(prompt)
+            return _get_response_text(response).strip()
+        except Exception:
+            return "Global summary could not be generated."
+
     def smart_summarize_paper(self, full_text: str, existing_sections: dict[str, str] = None) -> dict[str, str]:
         """
         Group natural sections into logical buckets, summarize them, and ensure
@@ -817,6 +879,57 @@ If no specific licenses are mentioned, return ["None mentioned"].
             logger.error(f"Ollama license extraction error: {e}")
             return ["None mentioned"]
 
+    def extract_paper_info(self, context: str) -> dict[str, str]:
+        prompt = f"""You are a research assistant. Extract the TITLE and AUTHORS of the paper accurately.
+        
+        RULES:
+        - The title is the main headline of the paper.
+        - Authors are the names of the researchers (strip affiliations and emails).
+        - Format authors as a clean comma-separated list.
+        - Return ONLY JSON.
+        
+        Example:
+        {{ "title": "Attention is All You Need", "authors": "Ashish Vaswani, Noam Shazeer" }}
+
+        Text:
+        {context[:10000]}
+        """
+        try:
+            text = self._generate(prompt, json_mode=True)
+            result = _parse_json_safe(text, {"title": "Unknown", "authors": "Unknown"})
+            if isinstance(result, dict):
+                return {
+                    "title": result.get("title", "Unknown"),
+                    "authors": result.get("authors", "Unknown")
+                }
+            return {"title": "Unknown", "authors": "Unknown"}
+        except Exception as e:
+            logger.error(f"Ollama info extraction error: {e}")
+            return {"title": "Unknown", "authors": "Unknown"}
+
+    def generate_global_summary(self, section_summaries: dict[str, str]) -> str:
+        # Flatten all section summaries into one text block
+        combined_text = "\n\n".join([f"### {name}\n{text}" for name, text in section_summaries.items()])
+        
+        prompt = f"""You are an AI research assistant. Summarize this research paper based on its section summaries.
+        
+        REQUIRED FORMAT:
+        - Return 4 to 6 concise bullet points.
+        - Start each line with a "• ".
+        - No headings, no preamble, no conclusions.
+        - Focus on: Problem, Methodology, Results, Conclusion.
+        
+        Section Summaries:
+        {combined_text[:30000]}
+        
+        Global Summary:"""
+        
+        try:
+            return self._generate(prompt).strip()
+        except Exception as e:
+            logger.error(f"Ollama global summary error: {e}")
+            return "Global summary could not be generated."
+
     def smart_summarize_paper(self, full_text: str, existing_sections: dict[str, str] = None) -> dict[str, str]:
         """
         Group natural sections into logical buckets for Ollama.
@@ -971,3 +1084,9 @@ class LLMService:
 
     def extract_licenses(self, context: str) -> list[str]:
         return self.backend.extract_licenses(context)
+
+    def extract_paper_info(self, context: str) -> dict[str, str]:
+        return self.backend.extract_paper_info(context)
+
+    def generate_global_summary(self, section_summaries: dict[str, str]) -> str:
+        return self.backend.generate_global_summary(section_summaries)

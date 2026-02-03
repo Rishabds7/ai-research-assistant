@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"; // We'll use standard input for file upload
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, UploadCloud, Trash2 } from "lucide-react";
-import { useTaskPoll } from "@/hooks/useTaskPoll";
+import { ReviewTab } from "@/components/ReviewTab";
 
 export default function Home() {
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -130,10 +130,9 @@ export default function Home() {
         </div>
 
         <Tabs defaultValue="papers" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="papers">📄 Papers</TabsTrigger>
-            <TabsTrigger value="gaps">🔍 Research Gaps</TabsTrigger>
-            <TabsTrigger value="comparison">📊 Comparison</TabsTrigger>
+            <TabsTrigger value="review">📋 Review</TabsTrigger>
           </TabsList>
 
           <TabsContent value="papers" className="space-y-4">
@@ -148,16 +147,8 @@ export default function Home() {
             )}
           </TabsContent>
 
-          <TabsContent value="gaps">
-            <div className="p-8 bg-white rounded-lg border text-center">
-              <p className="text-slate-500">Select papers to analyze gaps (Implementation pending connection to API)</p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="comparison">
-            <div className="p-8 bg-white rounded-lg border text-center">
-              <p className="text-slate-500">Select papers to compare (Implementation pending connection to API)</p>
-            </div>
+          <TabsContent value="review">
+            <ReviewTab papers={papers} onUpdate={fetchPapers} />
           </TabsContent>
         </Tabs>
       </div>
