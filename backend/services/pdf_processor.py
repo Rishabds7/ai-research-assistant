@@ -23,6 +23,7 @@ class PDFProcessor:
         "preliminaries",
         "problem statement",
         "methodology",
+        "methods",
         "method",
         "proposed method",
         "proposed approach",
@@ -33,8 +34,12 @@ class PDFProcessor:
         "implementation",
         "experiments",
         "experimental setup",
+        "experimental setups",
         "experimental design",
         "evaluation",
+        "evaluation results",
+        "datasets",
+        "datasets and metrics",
         "results",
         "performance analysis",
         "discussion",
@@ -71,7 +76,8 @@ class PDFProcessor:
         try:
             text_parts: list[str] = []
             for page in doc:
-                text_parts.append(page.get_text())
+                # Use sort=True to better handle multi-column layouts
+                text_parts.append(page.get_text("text", sort=True))
             doc.close()
             full_text = "\n".join(text_parts).strip()
             if not full_text:
@@ -91,9 +97,9 @@ class PDFProcessor:
         sections: dict[str, str] = {}
         text_lower = text.lower()
         
-        # 1. First, find all potential numbered headers (e.g., "1. Introduction", "2 Related Work")
-        # This catches custom-named methodology sections like "3. GRAPHRAG"
-        generic_header_pat = r"(?:\n|^)(\d+\.?\s+([A-Z][A-Za-z\s]{3,50}))\s*(?:\n|$)"
+        # 1. First, find all potential numbered headers (e.g., "1. Introduction", "5.1 Experimental Setups")
+        # Supports nested numbering like 1.1, 5.1.1 etc.
+        generic_header_pat = r"(?:\n|^)((?:\d+\.)*\d+\.?\s+([A-Z][A-Za-z\s]{3,60}))\s*(?:\n|$)"
         matches = list(re.finditer(generic_header_pat, text))
         
         discovered_headers = []

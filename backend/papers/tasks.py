@@ -194,37 +194,61 @@ def extract_metadata_task(self, paper_id, field):
         llm = LLMService()
         
         # 1. Smarter Context Selection
-        # Instead of just the first 12k chars, let's look for relevant sections
+        # We re-run section detection to benefit from any improvements in PDFProcessor (like nested numbering)
+        processor = PDFProcessor()
+        sections = processor.detect_sections(paper.full_text)
+        paper.sections = sanitize_text(sections)
+        # Save sections so they are available for future use
+        paper.save(update_fields=['sections'])
+        
         context = ""
-        sections = paper.sections or {}
         
         if field == 'datasets':
-            # Priority: A large contiguous block of the beginning is often better than fragmented parts
-            # But we must respect the LLM provider's context limits
+            # Priority: Core introduction + Targeted sections (Experiments, Evaluation)
             is_ollama = getattr(llm, 'provider', '').lower() == 'ollama'
-            limit = 20000 if is_ollama else 60000
+            limit = 25000 if is_ollama else 75000 # Increased limit for Gemini
             
-            # 1. Start with first portion of the paper
-            context = "### PAPER START & EARLY FIGURES\n" + paper.full_text[:limit]
+            # 1. Start with the Abstract/Introduction (first 12k characters - usually covers first 3 pages)
+            context_blocks = ["### PAPER START & INTRODUCTION/ABSTRACT\n" + paper.full_text[:12000]]
             
-            # 2. If it's not Ollama, we can afford to add more sections
-            if not is_ollama:
-                target_keywords = ["experiment", "evaluation", "benchmark", "results", "analysis"]
-                sections_to_append = []
-                for name, content in sections.items():
-                    if any(k in name.lower() for k in target_keywords):
-                        if content[:200] not in context:
-                            sections_to_append.append(f"### {name.upper()}\n{content}")
-                
-                if sections_to_append:
-                    context += "\n\n" + "\n\n".join(sections_to_append)
-                    context = context[:80000] # Final cap for high-end models
+            # 2. Targeted Section Search: Look for Experiments, Evaluation, Setup, or Datasets
+            # Added more specific keywords and synonyms
+            dataset_keywords = ["dataset", "experiment", "evaluation", "benchmark", "setup", "analysis", "implementation", "data", "metric", "material"]
             
+            target_sections = []
+            for name, content in sections.items():
+                name_lower = name.lower()
+                if any(k in name_lower for k in dataset_keywords):
+                    # Only add if it's not already covered by the first 12k chars
+                    # We check if the section start is beyond the first 12k
+                    if paper.full_text.find(content[:100]) > 10000:
+                        target_sections.append(f"### SECTION: {name.upper()}\n{content}")
+            
+            # 3. Add targeted sections until we hit the context limit
+            current_len = len(context_blocks[0])
+            for section in target_sections:
+                if current_len + len(section) < limit:
+                    context_blocks.append(section)
+                    current_len += len(section)
+                else:
+                    # If we can't fit the whole thing, take what we can
+                    remaining = limit - current_len
+                    if remaining > 1000:
+                        context_blocks.append(section[:remaining])
+                    break
+            
+            # 4. If we still have plenty of room and very few targeted sections, add more from the beginning
+            if current_len < (limit // 2) and len(paper.full_text) > current_len:
+                remaining_text = paper.full_text[12000:limit]
+                if remaining_text:
+                    context_blocks.append("### ADDITIONAL CONTENT\n" + remaining_text)
+
+            context = "\n\n".join(context_blocks)
             result = llm.extract_datasets(context)
             
         elif field == 'licenses':
             # Licenses are often in Introduction, Footnotes, or Acknowledgments
-            target_keywords = ["introduction", "acknowledgment", "reference", "appendix"]
+            target_keywords = ["introduction", "acknowledgment", "reference", "appendix", "license", "copyright", "availability", "footnote"]
             found_sections = []
             for name, content in sections.items():
                 if any(k in name.lower() for k in target_keywords):

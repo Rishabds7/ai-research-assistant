@@ -78,7 +78,7 @@ def _parse_json_safe(raw: str, default: Any = None) -> Any:
             if parsed is not None:
                 # Shared logic for dict unpacking: if model returns {"datasets": [...]}
                 if isinstance(parsed, dict):
-                    for key in ["datasets", "dataset_names", "items", "data", "results"]:
+                    for key in ["datasets", "dataset_names", "dataset", "dataset_list", "items", "data", "results"]:
                         if key in parsed and isinstance(parsed[key], list):
                             return parsed[key]
                 return parsed
@@ -397,19 +397,21 @@ Return only the markdown table."""
 
     def extract_datasets(self, context: str) -> list[str]:
         prompt = f"""You are a research assistant. Your task is to extract the names of ALL datasets used for training, evaluation, or benchmarking in this research paper.
-        
+
         CRITICAL INSTRUCTIONS:
         1. Contextual Understanding: Scan for patterns like:
            - "Evaluated on [Name]..."
            - "Figure 1 shows performance on [Name]..."
            - "Using [Name] dataset (size)..."
            - "Trained on [Name] and [Name]..."
-        2. Scope: Look at Abstract, Introduction, AND Fig/Table captions.
-        3. Medical Focus: Specifically look for benchmarks like "MIMIC-CXR", "CheXpert", "BraTS", etc., and their sizes (e.g., 369K).
-        4. Standard Names: Provide the standard name and acronym if both exist.
+           - "Following prior work (Hu et al. 2024), we use the [Name] benchmark..."
+        2. Scope: Look at Abstract, Introduction, AND specifically Experimental Setup/Evaluation sections.
+        3. Medical Focus: Specifically look for benchmarks like "MIMIC-CXR", "CheXpert", "BraTS", "SLAKE", "VQA-RAD", "PathVQA", "Quilt-VQA", etc.
+        4. Detail: Include the version or size if mentioned (e.g., "MIMIC-CXR v2.0").
+        5. Exclusion: Do NOT include model names (like ResNet, BERT, or the model being proposed in the paper).
         
         Return ONLY a valid JSON list of strings. 
-        Example Output: ["MIMIC-CXR (369K)", "CheXpert (191K)", "Natural Questions (NQ)"]
+        Example Output: ["MIMIC-CXR (369K)", "CheXpert (191K)", "SLAKE", "VQA-RAD"]
         
         If absolutely no dataset names are detected, return ["None mentioned"].
         
@@ -751,7 +753,7 @@ CRITICAL EXCLUSION RULES:
 Look for:
 - Formally named research benchmarks and corpora.
 - Proper nouns often followed by "dataset", "corpus", "benchmark", or "data".
-- Examples: ImageNet, GLUE, SQuAD, MIMIC-CXR, WMT14, MS-COCO, Visual Genome.
+- Specific medical benchmarks: MIMIC-CXR, CheXpert, SLAKE, VQA-RAD, PATHVQA, Quilt-VQA, MedVQA.
 
 Context:
 {context[:25000]}
@@ -770,7 +772,7 @@ STRICT DATASET POLICY:
             
             # Handle if LLM returned a dict with a key
             if isinstance(data, dict):
-                for key in ["datasets", "dataset_names", "items", "data"]:
+                for key in ["datasets", "dataset_names", "dataset", "dataset_list", "items", "data"]:
                     if key in data and isinstance(data[key], list):
                         data = data[key]
                         break
