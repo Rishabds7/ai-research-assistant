@@ -1,4 +1,4 @@
-# Research Assistant MVP (AI Analysis Tool)
+# AI Research Assistant
 **Status:** Multi-feature development in progress (Summarization, Dataset Extraction, Git Integration)
 *Last Updated: February 2026*
 

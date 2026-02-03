@@ -28,45 +28,56 @@ export default function Home() {
   }, []);
 
 
+  const handleButtonClick = () => {
+    const input = document.getElementById('file-upload-input') as HTMLInputElement;
+    if (input) input.click();
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files);
-      setUploadingCount(prev => prev + files.length);
+      const selectedFiles = Array.from(e.target.files);
 
-      // Process each file
-      for (const file of files) {
-        // Simple frontend check: is this filename already in our list?
-        if (papers.some(p => p.filename === file.name)) {
-          alert(`Skip: "${file.name}" is already in your list.`);
-          setUploadingCount(prev => Math.max(0, prev - 1));
-          continue;
-        }
+      // Filter out files that are already in the list
+      const newFiles = selectedFiles.filter(file =>
+        !papers.some(p => p.filename === file.name)
+      );
 
+      if (newFiles.length < selectedFiles.length) {
+        console.warn(`${selectedFiles.length - newFiles.length} files skipped (duplicates).`);
+      }
+
+      if (newFiles.length === 0) {
+        e.target.value = '';
+        return;
+      }
+
+      setUploadingCount(prev => prev + newFiles.length);
+
+      // Upload in parallel
+      await Promise.all(newFiles.map(async (file) => {
         try {
           const res = await uploadPaper(file);
-          // Attaching the task_id to the paper object so PaperItem can poll for it
           const newPaper = { ...res.paper, uploadTaskId: res.task_id };
           setPapers((prev) => [newPaper, ...prev]);
         } catch (e: any) {
-          console.error(e);
-          const msg = e.response?.data?.error || `Upload failed for ${file.name}`;
-          alert(msg);
+          console.error(`Upload failed: ${file.name}`, e);
+          alert(`Upload failed for ${file.name}`);
         } finally {
           setUploadingCount(prev => Math.max(0, prev - 1));
         }
-      }
+      }));
+
+      e.target.value = '';
     }
   };
 
   const handleDeleteAll = async () => {
-    if (confirm("Are you sure you want to delete ALL papers? This action cannot be undone.")) {
+    if (confirm("Are you sure you want to delete ALL papers?")) {
       try {
         await deleteAllPapers();
         fetchPapers();
       } catch (e) {
-        console.error("Failed to delete all papers", e);
-        alert("Failed to delete all papers");
+        console.error("Delete all failed", e);
       }
     }
   };
@@ -76,8 +87,7 @@ export default function Home() {
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Research Assistant</h1>
-            <p className="text-slate-500">Next.js + Django + Celery Implementation</p>
+            <h1 className="text-3xl font-bold text-slate-900">AI Research Assistant</h1>
           </div>
 
           <div className="flex items-center gap-4">
@@ -92,25 +102,30 @@ export default function Home() {
               </Button>
             )}
 
-            {/* Upload Button Wrapper */}
-            <div className="relative">
-              <input
-                type="file"
-                accept=".pdf"
-                multiple
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={handleFileChange}
-                disabled={uploadingCount > 0}
-              />
-              <Button disabled={uploadingCount > 0}>
-                {uploadingCount > 0 ? (
+            <input
+              id="file-upload-input"
+              type="file"
+              accept=".pdf"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <Button
+              onClick={handleButtonClick}
+              disabled={uploadingCount > 10} // Just a safety latch
+            >
+              {uploadingCount > 0 ? (
+                <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
+                  Uploading {uploadingCount}...
+                </>
+              ) : (
+                <>
                   <UploadCloud className="mr-2 h-4 w-4" />
-                )}
-                {uploadingCount > 0 ? `Uploading (${uploadingCount})...` : "Upload PDFs"}
-              </Button>
-            </div>
+                  Upload PDFs
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
