@@ -3,7 +3,7 @@ import { Paper, extractAllSections, deletePaper, extractMetadata } from '@/lib/a
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useTaskPoll } from '@/hooks/useTaskPoll';
-import { Loader2, FileText, CheckCircle2, Trash2, ChevronDown, ChevronRight, Database, Award, List, Eye, X } from 'lucide-react';
+import { Loader2, FileText, CheckCircle2, Trash2, ChevronDown, ChevronRight, Database, Award, List } from 'lucide-react';
 
 interface PaperItemProps {
     paper: Paper;
@@ -26,15 +26,11 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     );
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
     const [isSummariesVisible, setIsSummariesVisible] = useState(true);
-    const [showPdf, setShowPdf] = useState(false);
-    const [isProcessingLocal, setIsProcessingLocal] = useState(!paper.processed);
-
 
     // Sync task IDs from paper.task_ids if they become available or update
     useEffect(() => {
         if (!paper.processed && paper.uploadTaskId) {
             setProcessTaskId(paper.uploadTaskId);
-            setIsProcessingLocal(true);
         }
         if (paper.task_ids?.summarize && (!paper.section_summaries || paper.section_summaries.length === 0)) {
             setSummarizeTaskId(paper.task_ids.summarize);
@@ -45,18 +41,16 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         if (paper.task_ids?.licenses && !paper.metadata?.licenses) {
             setLicensesTaskId(paper.task_ids.licenses);
         }
-        if (paper.processed) {
-            setIsProcessingLocal(false);
-        }
     }, [paper.task_ids, paper.section_summaries, paper.metadata, paper.processed, paper.uploadTaskId]);
+
 
 
     // Poll for initial processing
     const { status: processStatus } = useTaskPoll(processTaskId, () => {
         onUpdate();
         setProcessTaskId(null);
-        setIsProcessingLocal(false);
     });
+
 
     // Poll for summarize
     const { status: sumStatus } = useTaskPoll(summarizeTaskId, () => {
@@ -131,24 +125,16 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                         <CardTitle className="text-lg font-bold">{paper.filename}</CardTitle>
                     </div>
                     <div className="flex gap-2">
-                        {isProcessingLocal && (
+                        {!paper.processed && (
                             <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-md text-sm border border-blue-100">
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 Processing...
                             </div>
                         )}
+
                         {paper.processed && (
                             <>
 
-                                <Button
-                                    variant={showPdf ? "default" : "outline"}
-                                    size="sm"
-                                    className={`gap-2 ${showPdf ? "bg-blue-600 hover:bg-blue-700" : ""}`}
-                                    onClick={() => setShowPdf(!showPdf)}
-                                >
-                                    <Eye className="h-4 w-4" />
-                                    {showPdf ? "Hide PDF" : "View PDF"}
-                                </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -194,56 +180,6 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                 </div>
             </CardHeader>
             <CardContent>
-                {/* PDF Viewer Section */}
-                {showPdf && (
-                    <div className="mb-6 animate-in fade-in zoom-in duration-300">
-                        <div className="relative rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-100 shadow-inner">
-                            <div className="absolute top-2 right-2 z-10">
-                                <Button
-                                    size="icon"
-                                    variant="secondary"
-                                    className="h-8 w-8 rounded-full shadow-md bg-white/90 hover:bg-white"
-                                    onClick={() => setShowPdf(false)}
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            <object
-                                data={`${paper.file}#view=FitH`}
-                                type="application/pdf"
-                                className="w-full h-[650px] border-none"
-                            >
-                                <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 p-8 text-center">
-                                    <FileText className="h-12 w-12 text-slate-300 mb-4" />
-                                    <p className="text-slate-600 font-medium mb-2">Unable to display PDF directly.</p>
-                                    <p className="text-slate-400 text-sm mb-6">Your browser might be blocking the embedded viewer.</p>
-                                    <a
-                                        href={paper.file}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 py-2 px-4 shadow-sm"
-                                    >
-                                        Open PDF in New Tab
-                                    </a>
-                                </div>
-                            </object>
-                            <div className="p-2 bg-slate-900 text-white text-[10px] flex justify-between items-center px-4">
-                                <span className="flex items-center gap-2">
-                                    <CheckCircle2 className="h-3 w-3 text-green-400" />
-                                    Viewing: {paper.filename} (Original Document)
-                                </span>
-                                <a
-                                    href={paper.file}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="underline hover:text-blue-300 font-bold"
-                                >
-                                    Open in New Tab
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                )}
                 {/* Status Indicators & Metadata Snippets */}
                 <div className="flex flex-wrap gap-4 text-xs text-slate-500 mb-4 border-b pb-3">
                     <div className="flex items-center gap-1">

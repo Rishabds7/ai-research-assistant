@@ -76,7 +76,8 @@ export default function Home() {
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">AI Research Assistant</h1>
+            <h1 className="text-3xl font-bold text-slate-900">Research Assistant</h1>
+            <p className="text-slate-500">Next.js + Django + Celery Implementation</p>
           </div>
 
           <div className="flex items-center gap-4">
