@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Download, FileEdit, X } from "lucide-react";
 import { useState } from "react";
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea } from "./ui/textarea";
 
 interface ModalProps {
     isOpen: boolean;
@@ -153,7 +153,7 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                                                 ))}
                                             </ul>
                                         ) : (
-                                            <p className="text-xs text-slate-400 italic">No global summary generated. Click "Summarize" in the Papers tab.</p>
+                                            <p className="text-xs text-slate-400 italic">No global summary generated. Click &quot;Summarize&quot; in the Papers tab.</p>
                                         )}
                                     </TableCell>
                                     <TableCell className="align-top">
