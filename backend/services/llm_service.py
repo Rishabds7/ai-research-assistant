@@ -16,11 +16,13 @@ from google.api_core import exceptions as google_exceptions
 
 from django.conf import settings
 
-GEMINI_API_KEY = settings.GEMINI_API_KEY
-GEMINI_MODEL = settings.GEMINI_MODEL
-LLM_PROVIDER = settings.LLM_PROVIDER
-OLLAMA_HOST = settings.OLLAMA_HOST
-OLLAMA_MODEL = settings.OLLAMA_MODEL
+# These are defaults, but we will re-read them in the service to be safe
+_GEMINI_API_KEY = settings.GEMINI_API_KEY
+_GEMINI_MODEL = settings.GEMINI_MODEL
+_LLM_PROVIDER = settings.LLM_PROVIDER
+_OLLAMA_HOST = settings.OLLAMA_HOST
+_OLLAMA_MODEL = settings.OLLAMA_MODEL
+
 
 
 class LLMBackend(Protocol):
@@ -600,9 +602,10 @@ Return a bullet-point summary:"""
 
 class OllamaLLMService:
     def __init__(self) -> None:
-        self.host = OLLAMA_HOST.rstrip("/")
-        self.model = OLLAMA_MODEL
-        # Check connection immediately? No, let strict lazy loading handle it to avoid init crashes if possible.
+        from django.conf import settings
+        self.host = getattr(settings, 'OLLAMA_HOST', 'http://localhost:11434').rstrip("/")
+        self.model = getattr(settings, 'OLLAMA_MODEL', 'llama3')
+
 
     def _generate(self, prompt: str, json_mode: bool = False) -> str:
         url = f"{self.host}/api/generate"
@@ -900,6 +903,8 @@ Return ONLY the bullet points:"""
 
         return {cat: final_summaries[cat] for cat in logical_order if cat in final_summaries}
 
+
+
     def summarize_sections(self, sections: dict[str, str]) -> dict[str, str] :
         """
         Generate summaries for each section of a paper.
@@ -934,11 +939,15 @@ Return a bullet-point summary (use • for bullets):"""
 
 class LLMService:
     def __init__(self):
-        self.provider = LLM_PROVIDER.lower()
+        from django.conf import settings
+        self.provider = getattr(settings, 'LLM_PROVIDER', 'ollama').lower()
+        logger.info(f"Initializing LLMService with provider: {self.provider}")
+        
         if self.provider == "ollama":
             self.backend = OllamaLLMService()
         else:
             self.backend = GeminiLLMService()
+
 
     def extract_methodology(self, context: str) -> dict[str, Any]:
         return self.backend.extract_methodology(context)

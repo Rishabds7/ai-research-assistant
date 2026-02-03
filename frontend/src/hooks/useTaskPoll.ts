@@ -9,7 +9,7 @@ export function useTaskPoll(taskId: string | null, onComplete?: (result: any) =>
     useEffect(() => {
         if (!taskId) return;
 
-        const interval = setInterval(async () => {
+        const checkStatus = async () => {
             try {
                 const data = await getTaskStatus(taskId);
                 setStatus(data.status);
@@ -17,17 +17,27 @@ export function useTaskPoll(taskId: string | null, onComplete?: (result: any) =>
                 if (data.status === 'completed') {
                     setResult(data.result);
                     if (onComplete) onComplete(data.result);
-                    clearInterval(interval);
+                    return true;
                 } else if (data.status === 'failed') {
                     setError(data.error);
-                    clearInterval(interval);
+                    return true;
                 }
             } catch (err) {
                 console.error(err);
                 setError('Failed to poll task status');
-                clearInterval(interval);
+                return true;
             }
+            return false;
+        };
+
+        // Run immediately
+        checkStatus();
+
+        const interval = setInterval(async () => {
+            const finished = await checkStatus();
+            if (finished) clearInterval(interval);
         }, 2000); // Poll every 2 seconds
+
 
         return () => clearInterval(interval);
     }, [taskId]);

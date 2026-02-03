@@ -28,15 +28,19 @@ class PaperViewSet(viewsets.ModelViewSet):
         if 'file' not in request.FILES:
             return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
             
-        if Paper.objects.filter(filename=request.FILES['file'].name).exists():
+        uploaded_file = request.FILES['file']
+        
+        # 1. Filename check
+        if Paper.objects.filter(filename=uploaded_file.name).exists():
             return Response({'error': 'A paper with this filename already exists.'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        paper = serializer.save(filename=request.FILES['file'].name)
+        paper = serializer.save(filename=uploaded_file.name)
         
         # Trigger processing task
         task = process_pdf_task.delay(str(paper.id))
+
         
         # Create initial TaskStatus
         TaskStatus.objects.create(

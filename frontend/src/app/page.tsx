@@ -11,8 +11,8 @@ import { useTaskPoll } from "@/hooks/useTaskPoll";
 
 export default function Home() {
   const [papers, setPapers] = useState<Paper[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadTaskId, setUploadTaskId] = useState<string | null>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
+
 
   const fetchPapers = async () => {
     try {
@@ -27,28 +27,34 @@ export default function Home() {
     fetchPapers();
   }, []);
 
-  // Poll upload task
-  const { status: uploadStatus } = useTaskPoll(uploadTaskId, () => {
-    setUploadTaskId(null);
-    setUploading(false);
-    fetchPapers(); // Refresh to show processed status
-  });
+
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setUploading(true);
-      try {
-        const res = await uploadPaper(file);
-        // Res returns { paper, task_id }
-        // Add paper immediately to list
-        setPapers((prev) => [res.paper, ...prev]);
-        setUploadTaskId(res.task_id);
-      } catch (e: any) {
-        console.error(e);
-        const msg = e.response?.data?.error || "Upload failed";
-        alert(msg);
-        setUploading(false);
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      setUploadingCount(prev => prev + files.length);
+
+      // Process each file
+      for (const file of files) {
+        // Simple frontend check: is this filename already in our list?
+        if (papers.some(p => p.filename === file.name)) {
+          alert(`Skip: "${file.name}" is already in your list.`);
+          setUploadingCount(prev => Math.max(0, prev - 1));
+          continue;
+        }
+
+        try {
+          const res = await uploadPaper(file);
+          // Attaching the task_id to the paper object so PaperItem can poll for it
+          const newPaper = { ...res.paper, uploadTaskId: res.task_id };
+          setPapers((prev) => [newPaper, ...prev]);
+        } catch (e: any) {
+          console.error(e);
+          const msg = e.response?.data?.error || `Upload failed for ${file.name}`;
+          alert(msg);
+        } finally {
+          setUploadingCount(prev => Math.max(0, prev - 1));
+        }
       }
     }
   };
@@ -90,17 +96,18 @@ export default function Home() {
               <input
                 type="file"
                 accept=".pdf"
+                multiple
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 onChange={handleFileChange}
-                disabled={uploading}
+                disabled={uploadingCount > 0}
               />
-              <Button disabled={uploading || !!uploadTaskId}>
-                {uploading || uploadTaskId ? (
+              <Button disabled={uploadingCount > 0}>
+                {uploadingCount > 0 ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <UploadCloud className="mr-2 h-4 w-4" />
                 )}
-                {uploadTaskId ? "Processing..." : "Upload PDF"}
+                {uploadingCount > 0 ? `Uploading (${uploadingCount})...` : "Upload PDFs"}
               </Button>
             </div>
           </div>

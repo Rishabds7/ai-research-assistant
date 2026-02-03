@@ -13,12 +13,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False)
 )
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+# Check multiple locations for .env
+env_locations = [
+    os.path.join(BASE_DIR, '.env'),
+    os.path.join(BASE_DIR.parent, '.env'),
+    os.path.join(os.getcwd(), '.env'),
+]
+for loc in env_locations:
+    if os.path.exists(loc):
+        environ.Env.read_env(loc)
+        break
 
 # Security
-SECRET_KEY = env('SECRET_KEY')
-DEBUG = env('DEBUG')
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-fallback-key-for-migrations-only')
+DEBUG = env('DEBUG', default=True)
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # Application definition
 INSTALLED_APPS = [

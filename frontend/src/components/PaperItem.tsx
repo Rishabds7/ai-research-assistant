@@ -11,7 +11,11 @@ interface PaperItemProps {
 }
 
 export function PaperItem({ paper, onUpdate }: PaperItemProps) {
+    const [processTaskId, setProcessTaskId] = useState<string | null>(
+        !paper.processed ? (paper.uploadTaskId || null) : null
+    );
     const [summarizeTaskId, setSummarizeTaskId] = useState<string | null>(
+
         (!paper.section_summaries || paper.section_summaries.length === 0) ? (paper.task_ids?.summarize || null) : null
     );
     const [datasetsTaskId, setDatasetsTaskId] = useState<string | null>(
@@ -23,9 +27,15 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
     const [isSummariesVisible, setIsSummariesVisible] = useState(true);
     const [showPdf, setShowPdf] = useState(false);
+    const [isProcessingLocal, setIsProcessingLocal] = useState(!paper.processed);
+
 
     // Sync task IDs from paper.task_ids if they become available or update
     useEffect(() => {
+        if (!paper.processed && paper.uploadTaskId) {
+            setProcessTaskId(paper.uploadTaskId);
+            setIsProcessingLocal(true);
+        }
         if (paper.task_ids?.summarize && (!paper.section_summaries || paper.section_summaries.length === 0)) {
             setSummarizeTaskId(paper.task_ids.summarize);
         }
@@ -35,10 +45,22 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         if (paper.task_ids?.licenses && !paper.metadata?.licenses) {
             setLicensesTaskId(paper.task_ids.licenses);
         }
-    }, [paper.task_ids, paper.section_summaries, paper.metadata]);
+        if (paper.processed) {
+            setIsProcessingLocal(false);
+        }
+    }, [paper.task_ids, paper.section_summaries, paper.metadata, paper.processed, paper.uploadTaskId]);
+
+
+    // Poll for initial processing
+    const { status: processStatus } = useTaskPoll(processTaskId, () => {
+        onUpdate();
+        setProcessTaskId(null);
+        setIsProcessingLocal(false);
+    });
 
     // Poll for summarize
     const { status: sumStatus } = useTaskPoll(summarizeTaskId, () => {
+
         onUpdate();
         setSummarizeTaskId(null);
     });
@@ -95,9 +117,10 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         }
     };
 
-    const isSumLoading = sumStatus === 'pending' || sumStatus === 'running';
-    const isDsLoading = dsStatus === 'pending' || dsStatus === 'running';
-    const isLicLoading = licStatus === 'pending' || licStatus === 'running';
+    const isSumLoading = !!summarizeTaskId && (sumStatus === 'idle' || sumStatus === 'pending' || sumStatus === 'running');
+    const isDsLoading = !!datasetsTaskId && (dsStatus === 'idle' || dsStatus === 'pending' || dsStatus === 'running');
+    const isLicLoading = !!licensesTaskId && (licStatus === 'idle' || licStatus === 'pending' || licStatus === 'running');
+
 
     return (
         <Card className="mb-4">
@@ -108,8 +131,15 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                         <CardTitle className="text-lg font-bold">{paper.filename}</CardTitle>
                     </div>
                     <div className="flex gap-2">
+                        {isProcessingLocal && (
+                            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-md text-sm border border-blue-100">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Processing...
+                            </div>
+                        )}
                         {paper.processed && (
                             <>
+
                                 <Button
                                     variant={showPdf ? "default" : "outline"}
                                     size="sm"
@@ -231,7 +261,12 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                             {(paper.metadata.licenses[0] === "None mentioned" || paper.metadata.licenses[0] === "Not Available / Present") ? 0 : paper.metadata.licenses.length} Licenses
                         </div>
                     )}
+                    {/* Error Indicators */}
+                    {sumStatus === 'failed' && <div className="text-red-500 font-semibold border border-red-100 bg-red-50 px-2 py-0.5 rounded-full">Summary Failed</div>}
+                    {dsStatus === 'failed' && <div className="text-red-500 font-semibold border border-red-100 bg-red-50 px-2 py-0.5 rounded-full">Datasets Failed</div>}
+                    {licStatus === 'failed' && <div className="text-red-500 font-semibold border border-red-100 bg-red-50 px-2 py-0.5 rounded-full">Licenses Failed</div>}
                 </div>
+
 
                 {/* Metadata Results (Simple Lists) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
