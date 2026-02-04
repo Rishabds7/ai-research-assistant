@@ -163,3 +163,7 @@ class TaskStatusView(views.APIView):
         task = get_object_or_404(TaskStatus, task_id=task_id)
         serializer = TaskStatusSerializer(task)
         return Response(serializer.data)
+
+class PingView(views.APIView):
+    def get(self, request):
+        return Response({"status": "online", "message": "Backend is running!"}, status=status.HTTP_200_OK)

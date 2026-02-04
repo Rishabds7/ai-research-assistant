@@ -84,3 +84,8 @@ data/
 processed_pdfs/
 uploads/
 temp/
+
+# Documentation and Explanation files
+*.md
+!**/README.md
+!README_FULLSTACK.md

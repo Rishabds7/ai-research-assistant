@@ -6,7 +6,7 @@ export function useTaskPoll(taskId: string | null, onComplete?: (result: any) =>
     const [result, setResult] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
+    useEffect(() => { // when the page loads this will run
         if (!taskId) return;
 
         const checkStatus = async () => {
@@ -30,7 +30,7 @@ export function useTaskPoll(taskId: string | null, onComplete?: (result: any) =>
             return false;
         };
 
-        // Run immediately
+        // Run immediately          
         checkStatus();
 
         const interval = setInterval(async () => {
