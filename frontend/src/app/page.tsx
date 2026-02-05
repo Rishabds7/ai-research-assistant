@@ -24,7 +24,6 @@ export default function Home() {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
 
-
   const fetchPapers = async () => {
     try {
       const data = await getPapers();

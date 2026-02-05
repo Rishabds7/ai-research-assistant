@@ -2,11 +2,8 @@
 
 :root {
   --background: #D1C4FF;
-  /* Deeper Purple shade */
   --foreground: #1A202C;
-  /* Dark Slate for text */
   --card-yellow: #FFFBE6;
-  /* Soft Light Yellow */
   --accent-navy: #1A365D;
   --accent-gold: #D4AF37;
 }
@@ -31,7 +28,7 @@ body {
   }
 
   50% {
-    transform: translateY(-10px) rotate(2deg);
+    transform: translateY(-5px) rotate(1deg);
   }
 
   100% {
@@ -43,20 +40,95 @@ body {
   animation: logo-float 4s ease-in-out infinite;
 }
 
-@keyframes pulse-glow {
-  0% {
-    filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.3));
-  }
-
-  50% {
-    filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.6));
-  }
-
-  100% {
-    filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.3));
-  }
+.logo-glow {
+  filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.2));
+  transition: filter 0.3s;
 }
 
-.logo-glow {
-  animation: pulse-glow 3s infinite;
+.logo-glow:hover {
+  filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.5));
+}
+
+/* 3D BOOK PAGE TURN */
+.book-container {
+  perspective: 1000px;
+  width: 64px;
+  height: 64px;
+  position: relative;
+}
+
+.book-base {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+}
+
+.book-page-static {
+  width: 50%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.book-page-static img {
+  height: 100%;
+  width: 200%;
+  max-width: none;
+  object-fit: contain;
+}
+
+.book-right-static img {
+  margin-left: -100%;
+}
+
+.book-turning-page {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 50%;
+  height: 100%;
+  transform-origin: left center;
+  transition: transform 0.6s cubic-bezier(0.645, 0.045, 0.355, 1);
+  transform-style: preserve-3d;
+  z-index: 50;
+}
+
+.page-side {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  overflow: hidden;
+  background: white;
+}
+
+.page-back {
+  transform: rotateY(180deg);
+  background: #fdfdfd;
+  box-shadow: inset 10px 0 20px rgba(0, 0, 0, 0.05);
+}
+
+.page-side img {
+  height: 100%;
+  width: 200%;
+  max-width: none;
+  object-fit: contain;
+  margin-left: -100%;
+}
+
+.book-container:hover .book-turning-page {
+  transform: rotateY(-180deg);
+}
+
+.book-spine-line {
+  position: absolute;
+  left: 50%;
+  top: 5%;
+  bottom: 5%;
+  width: 1px;
+  background: rgba(26, 54, 93, 0.1);
+  z-index: 60;
 }
