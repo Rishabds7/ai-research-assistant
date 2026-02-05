@@ -367,13 +367,27 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                                 {isExpanded && (
                                                     <div className="p-4 bg-white border-t border-[#D4AF37]/10">
                                                         <ul className="space-y-3">
-                                                            {s.summary.split(/•|\n-|\n\*/).map((point, i) => {
-                                                                const cleanPoint = point.replace(/^[^:]*:\s*/, '').trim();
-                                                                if (!cleanPoint) return null;
+                                                            {s.summary.split(/\n/).filter(line => {
+                                                                const low = line.trim().toLowerCase();
+                                                                if (!low) return false;
+                                                                // Filter out AI chatter patterns
+                                                                if (low.includes("here are") && (low.includes("bullet") || low.includes("summary"))) return false;
+                                                                if (low.includes("concise bullet-points")) return false;
+                                                                if (low.endsWith(':') && (low.includes("summarizing") || low.includes("section"))) return false;
+                                                                return true;
+                                                            }).map((line, i) => {
+                                                                // Generic bullet cleaner: removes *, -, • and and all stars
+                                                                let cleanLine = line.trim()
+                                                                    .replace(/\*\*/g, '')          // 1. Remove ALL bold markers
+                                                                    .replace(/^[\s*•\-·]+/, '')    // 2. Remove leading bullets
+                                                                    .replace(/^\d+[\.\)]\s*/, '')  // 3. Remove leading numbers
+                                                                    .trim();
+
+                                                                if (!cleanLine) return null;
                                                                 return (
                                                                     <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed">
                                                                         <span className="text-[#D4AF37] shrink-0 font-bold mt-0.5">◇</span>
-                                                                        <span>{cleanPoint}</span>
+                                                                        <span>{cleanLine}</span>
                                                                     </li>
                                                                 );
                                                             })}

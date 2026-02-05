@@ -148,20 +148,29 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                                     <TableCell className="align-top py-6">
                                         {paper.global_summary ? (
                                             <ul className="text-xs space-y-3 text-slate-600">
-                                                {paper.global_summary.split(/\n|•|\*/).filter(p => {
-                                                    const clean = p.trim();
-                                                    if (!clean) return false;
-                                                    if (clean.toLowerCase().includes("here is a summary")) return false;
-                                                    if (clean.toLowerCase().includes("bullet points")) return false;
-                                                    if (clean.toLowerCase().includes("concise summary")) return false;
-                                                    if (clean.length < 5) return false;
+                                                {paper.global_summary.split(/\n/).filter(line => {
+                                                    const low = line.trim().toLowerCase();
+                                                    if (!low || low.length < 5) return false;
+                                                    if (low.includes("here is a summary") || low.includes("bullet points") || low.includes("concise summary")) return false;
+                                                    if (low.includes("here are") && (low.includes("bullet") || low.includes("summary"))) return false;
+                                                    if (low.includes("concise bullet-points")) return false;
+                                                    if (low.endsWith(':') && (low.includes("summarizing") || low.includes("section"))) return false;
                                                     return true;
-                                                }).map((point, i) => (
-                                                    <li key={i} className="flex gap-3 leading-relaxed">
-                                                        <span className="text-[#D4AF37] font-bold shrink-0">◇</span>
-                                                        <span>{point.trim()}</span>
-                                                    </li>
-                                                ))}
+                                                }).map((point, i) => {
+                                                    let cleanPoint = point.trim()
+                                                        .replace(/\*\*/g, '')          // Remove ALL stars
+                                                        .replace(/^[\s*•\-·]+/, '')    // Remove leading bullets
+                                                        .replace(/^\d+[\.\)]\s*/, '')  // Remove leading numbers
+                                                        .trim();
+
+                                                    if (!cleanPoint || cleanPoint.length < 2) return null;
+                                                    return (
+                                                        <li key={i} className="flex gap-3 leading-relaxed">
+                                                            <span className="text-[#D4AF37] font-bold shrink-0">◇</span>
+                                                            <span>{cleanPoint}</span>
+                                                        </li>
+                                                    );
+                                                })}
                                             </ul>
                                         ) : (
                                             <p className="text-xs text-slate-400 italic">No summary generated yet.</p>
