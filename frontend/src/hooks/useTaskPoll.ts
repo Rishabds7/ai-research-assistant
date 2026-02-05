@@ -1,3 +1,12 @@
+/**
+ * TASK POLLING HOOK
+ * Project: Research Assistant
+ * File: frontend/src/hooks/useTaskPoll.ts
+ * 
+ * A custom React hook that manages waiting for AI tasks to finish.
+ * It automatically pings the backend every 2 seconds until a task 
+ * is 'completed' or 'failed'.
+ */
 import { useState, useEffect } from 'react';
 import { getTaskStatus } from '@/lib/api';
 
@@ -6,9 +15,17 @@ export function useTaskPoll(taskId: string | null, onComplete?: (result: any) =>
     const [result, setResult] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => { // when the page loads this will run
+    useEffect(() => {
         if (!taskId) return;
 
+        /**
+         * POLLING LOGIC:
+         * Background tasks (like AI processing) can take 10s to 2mins.
+         * We use an Interval to ping the backend every 2 seconds.
+         * 1. 'checkStatus' hits the API.
+         * 2. If status is 'completed' or 'failed', we stop the interval (clearInterval).
+         * 3. We update state, which triggers a re-render in the UI.
+         */
         const checkStatus = async () => {
             try {
                 const data = await getTaskStatus(taskId);
@@ -30,13 +47,13 @@ export function useTaskPoll(taskId: string | null, onComplete?: (result: any) =>
             return false;
         };
 
-        // Run immediately          
+        // Run immediately to avoid a 2s delay on first load
         checkStatus();
 
         const interval = setInterval(async () => {
             const finished = await checkStatus();
             if (finished) clearInterval(interval);
-        }, 2000); // Poll every 2 seconds
+        }, 2000);
 
 
         return () => clearInterval(interval);

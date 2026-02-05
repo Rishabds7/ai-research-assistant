@@ -7,6 +7,17 @@ import { Download, FileEdit, X } from "lucide-react";
 import { useState } from "react";
 import { Textarea } from "./ui/textarea";
 
+/**
+ * AI REVIEW DASHBOARD
+ * 
+ * Purpose: This component acts as a high-level comparison matrix for research.
+ * It aggregates 'Global Summaries' (TL;DRs) from multiple papers into a 
+ * single structured view, enabling quick cross-paper synthesis.
+ * 
+ * AI Features:
+ * 1. Summary Aggregation: Displays the result of the 'Global Summary' task.
+ * 2. Export: Allows researchers to download the AI insights into a CSV for external analysis.
+ */
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -18,16 +29,16 @@ interface ModalProps {
 function Modal({ isOpen, onClose, title, children, footer }: ModalProps) {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
-                <div className="flex items-center justify-between p-4 border-b">
-                    <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-100 transition-colors">
-                        <X className="h-5 w-5 text-slate-500" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1A365D]/40 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-[#FDFBF7] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-[#F1E9D2] animate-in zoom-in duration-300">
+                <div className="flex items-center justify-between p-6 border-b border-[#F1E9D2]/50 bg-white">
+                    <h3 className="text-xl font-extrabold text-[#1A365D] tracking-tight">{title}</h3>
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-[#FDFBF7] text-slate-400 hover:text-[#D4AF37] transition-all">
+                        <X className="h-6 w-6" />
                     </button>
                 </div>
-                <div className="p-6">{children}</div>
-                {footer && <div className="flex justify-end gap-3 p-4 bg-slate-50 border-t">{footer}</div>}
+                <div className="p-8">{children}</div>
+                {footer && <div className="flex justify-end gap-4 p-6 bg-white border-t border-[#F1E9D2]/50">{footer}</div>}
             </div>
         </div>
     );
@@ -91,86 +102,86 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-slate-900">Literature Review</h2>
+            <div className="flex justify-between items-center bg-white/50 p-4 rounded-xl border border-[#F1E9D2]">
+                <h2 className="text-xl font-bold text-[#1A365D]">Literature Review</h2>
                 <Button
                     variant="outline"
                     onClick={downloadCSV}
                     disabled={reviewedPapers.length === 0}
+                    className="border-[#F1E9D2] hover:bg-[#FDFBF7] text-[#1A365D]"
                 >
                     <Download className="mr-2 h-4 w-4" />
-                    Download CSV
+                    Export Findings
                 </Button>
             </div>
 
             {reviewedPapers.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-lg border border-dashed border-slate-300">
+                <div className="text-center py-20 bg-[var(--card-yellow)] rounded-2xl border border-dashed border-[#F1E9D2]">
                     <p className="text-slate-500">
-                        No papers reviewed yet. Summarize a paper to see it here.
+                        No papers reviewed yet. Extract a summary in the Documents tab to see it here.
                     </p>
                 </div>
             ) : (
-                <div className="bg-white rounded-lg border overflow-hidden">
+                <div className="bg-white rounded-2xl border border-[#F1E9D2] overflow-hidden shadow-sm">
                     <Table>
                         <TableHeader>
-                            <TableRow className="bg-slate-50">
-                                <TableHead className="w-[200px] font-bold">Paper Name</TableHead>
-                                <TableHead className="font-bold">Summary</TableHead>
-                                <TableHead className="w-[250px] font-bold">Notes</TableHead>
+                            <TableRow className="bg-[#F1E9D2]/20 hover:bg-[#F1E9D2]/20">
+                                <TableHead className="w-[200px] font-bold text-[#1A365D]">Document</TableHead>
+                                <TableHead className="font-bold text-[#1A365D]">AI Synthesis</TableHead>
+                                <TableHead className="w-[250px] font-bold text-[#1A365D]">Personal Notes</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {reviewedPapers.map((paper) => (
-                                <TableRow key={paper.id}>
-                                    <TableCell className="align-top py-4">
-                                        <div className="font-bold text-slate-900 mb-1 leading-tight break-words">
+                                <TableRow key={paper.id} className="border-[#F1E9D2]/50 hover:bg-[#FDFBF7]/50 transition-colors">
+                                    <TableCell className="align-top py-6">
+                                        <div className="font-bold text-[#1A365D] mb-1 leading-tight break-words">
                                             {paper.filename}
                                         </div>
                                         {paper.title && (
-                                            <div className="text-[11px] text-slate-500 leading-snug mt-2 pt-2 border-t border-slate-100">
-                                                <span className="font-bold text-slate-400 uppercase tracking-tight">TITLE: </span>
+                                            <div className="text-[11px] text-slate-500 leading-snug mt-3 pt-3 border-t border-[#F1E9D2]/30">
+                                                <span className="font-bold text-[#D4AF37] uppercase tracking-tight">TITLE: </span>
                                                 <span className="italic">{paper.title}</span>
                                             </div>
                                         )}
                                     </TableCell>
-                                    <TableCell className="align-top py-4">
+                                    <TableCell className="align-top py-6">
                                         {paper.global_summary ? (
-                                            <ul className="text-xs space-y-2 text-slate-600">
+                                            <ul className="text-xs space-y-3 text-slate-600">
                                                 {paper.global_summary.split(/\n|•|\*/).filter(p => {
                                                     const clean = p.trim();
                                                     if (!clean) return false;
-                                                    // Filter out common LLM intro/outro phrases
                                                     if (clean.toLowerCase().includes("here is a summary")) return false;
                                                     if (clean.toLowerCase().includes("bullet points")) return false;
                                                     if (clean.toLowerCase().includes("concise summary")) return false;
                                                     if (clean.length < 5) return false;
                                                     return true;
                                                 }).map((point, i) => (
-                                                    <li key={i} className="flex gap-2 leading-relaxed">
-                                                        <span className="text-blue-500 font-bold shrink-0">•</span>
+                                                    <li key={i} className="flex gap-3 leading-relaxed">
+                                                        <span className="text-[#D4AF37] font-bold shrink-0">◇</span>
                                                         <span>{point.trim()}</span>
                                                     </li>
                                                 ))}
                                             </ul>
                                         ) : (
-                                            <p className="text-xs text-slate-400 italic">No global summary generated. Click &quot;Summarize&quot; in the Papers tab.</p>
+                                            <p className="text-xs text-slate-400 italic">No summary generated yet.</p>
                                         )}
                                     </TableCell>
-                                    <TableCell className="align-top">
+                                    <TableCell className="align-top py-6">
                                         <div
                                             onClick={() => handleEditNotes(paper)}
-                                            className="cursor-pointer group relative p-2 rounded hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all min-h-[60px]"
+                                            className="cursor-pointer group relative p-3 rounded-xl hover:bg-[#FDFBF7] border border-transparent hover:border-[#F1E9D2] transition-all min-h-[80px]"
                                         >
                                             {paper.notes ? (
-                                                <p className="text-xs text-slate-700 whitespace-pre-wrap">
+                                                <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
                                                     {paper.notes}
                                                 </p>
                                             ) : (
-                                                <p className="text-xs text-slate-400 italic">
-                                                    Click to add notes...
+                                                <p className="text-xs text-slate-300 italic">
+                                                    Click to add your insights...
                                                 </p>
                                             )}
-                                            <FileEdit className="absolute top-1 right-1 h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <FileEdit className="absolute top-2 right-2 h-3.5 w-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -186,10 +197,12 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                 title={`Notes for ${editingPaper?.filename}`}
                 footer={
                     <>
-                        <Button variant="outline" onClick={() => setEditingPaper(null)}>
-                            Cancel
+                        <Button variant="ghost" className="text-slate-400 font-bold" onClick={() => setEditingPaper(null)}>
+                            Discard
                         </Button>
-                        <Button onClick={handleSaveNotes}>Save Notes</Button>
+                        <Button className="bg-[#1A365D] hover:bg-[#2C5282] text-white px-8 rounded-xl" onClick={handleSaveNotes}>
+                            Save Insights
+                        </Button>
                     </>
                 }
             >

@@ -1,5 +1,10 @@
 """
-Celery configuration for the research assistant backend.
+CELERY TASK BROKER CONFIG
+Project: Research Assistant
+File: backend/core/celery.py
+
+This file initializes the background task worker system.
+It allows us to run heavy AI tasks (like processing PDFs) without slowing down the web server.
 """
 
 import os

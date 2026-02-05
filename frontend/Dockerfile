@@ -1,4 +1,9 @@
-# Use official Node image
+# FRONTEND DOCKERFILE
+# Project: Research Assistant
+# File: frontend/Dockerfile
+#
+# Builds the Node.js environment for the Next.js React application.
+
 FROM node:20-alpine
 
 # Set work directory

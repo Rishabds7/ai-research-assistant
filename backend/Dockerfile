@@ -1,4 +1,11 @@
 # Use an official Python runtime as a parent image
+# BACKEND DOCKERFILE
+# Project: Research Assistant
+# File: backend/Dockerfile
+#
+# Builds the Python environment for the Django API and Celery Worker.
+# Installs system dependencies for PDF processing (PyMuPDF needs specific libraries).
+
 FROM python:3.9-slim
 
 # Set environment variables

@@ -1,6 +1,13 @@
 """
-PDF processing service using PyMuPDF (fitz).
-Extracts text and detects paper sections (Abstract, Introduction, etc.).
+PDF PROCESSING SERVICE
+Project: Research Assistant
+File: backend/services/pdf_processor.py
+
+This service is the 'engine' for initial data extraction.
+It uses PyMuPDF (fitz) to:
+1. Load PDF files from disk.
+2. Extract clean text from pages (handling multi-column layouts).
+3. Use Regex and heuristics to detect the structural components (Abstract, Intro, Methods, etc.).
 """
 
 import json
@@ -11,7 +18,9 @@ from typing import Any, Union
 import fitz
 
 class PDFProcessor:
-    """Process PDF research papers: extract text and detect sections."""
+    """
+    Handles lower-level PDF manipulation and pattern matching.
+    """
 
     # Section headers to detect (case-insensitive)
     SECTION_PATTERNS = [
@@ -91,14 +100,18 @@ class PDFProcessor:
 
     def detect_sections(self, text: str) -> dict[str, str]:
         """
-        Detect paper sections using regex (case-insensitive).
-        Always combines predefined patterns with discovered numbered headers.
+        Segment the paper into logical parts (Abstract, Methodology, etc.) using a two-pass approach.
+        
+        Pass 1: Identifies numbered headers (e.g., '1. Introduction', 'II. Methods').
+        Pass 2: Searches for key academic keywords in isolation to catch non-numbered headers.
         """
         sections: dict[str, str] = {}
         text_lower = text.lower()
         
-        # 1. First, find all potential numbered headers (e.g., "1. Introduction", "5.1 Experimental Setups")
-        # Supports nested numbering like 1.1, 5.1.1 etc.
+        # Pass 1: Generic Numbered Headers
+        # Regex explanation:
+        # (?:\n|^) - Start of line
+        # ((?:\d+\.)*\d+\.?\s+([A-Z][A-Za-z\s]{3,60})) - Group 1: Whole header, Group 2: The text only
         generic_header_pat = r"(?:\n|^)((?:\d+\.)*\d+\.?\s+([A-Z][A-Za-z\s]{3,60}))\s*(?:\n|$)"
         matches = list(re.finditer(generic_header_pat, text))
         
@@ -115,16 +128,16 @@ class PDFProcessor:
                     "start": match.start()
                 })
 
-        # 2. Check predefined patterns to ensure standard names are correctly labeled
+        # Pass 2: Keyword-based matching for standard academic sections
         for section_name in self.SECTION_PATTERNS:
             pattern = rf"(?:\n|^)\s*(?:\d+\.?\s*)?{re.escape(section_name)}\s*(?:\n|$)"
             match = re.search(pattern, text_lower, re.IGNORECASE)
+            
             if match:
                 start = match.end()
-                # Find the next section start using either patterns or discovered headers
                 next_start = len(text)
                 
-                # Check other patterns
+                # Look ahead for the next major keyword boundary
                 for other in self.SECTION_PATTERNS:
                     if other == section_name: continue
                     p = rf"\n\s*(?:\d+\.?\s*)?{re.escape(other)}\s*(?:\n|$)"
@@ -133,7 +146,7 @@ class PDFProcessor:
                         cand = start + m.start()
                         if cand < next_start: next_start = cand
                 
-                # Check discovered headers
+                # Also check if a numbered header appears before the next keyword
                 for dh in discovered_headers:
                     if dh["start"] > match.start() and dh["start"] < next_start:
                         next_start = dh["start"]
@@ -142,11 +155,9 @@ class PDFProcessor:
                 if content:
                     sections[section_name.title()] = content
 
-        # 3. Add any discovered headers that weren't caught by the main patterns
-        # This is key for sections like "GraphRAG" or "Evaluation Results"
+        # Pass 3: Integration of unique discovered headers
         for dh in discovered_headers:
             title_lower = dh["title"].lower()
-            # If this title is substantially different from existing keys
             is_new = True
             for existing_key in list(sections.keys()):
                 if title_lower in existing_key.lower() or existing_key.lower() in title_lower:
@@ -155,50 +166,35 @@ class PDFProcessor:
             if is_new:
                 sections[dh["title"]] = dh["content"]
 
-        # 4. Pseudo-Abstract Detection: If "Abstract" is missing, find it before the first detected header
+        # Pass 4: Fallback for Abstract (often at the top without a clear header word)
         if "Abstract" not in sections:
             first_header_pos = len(text)
-            # Find the earliest header position (predefined patterns)
-            for section_name in self.SECTION_PATTERNS:
-                pattern = rf"(?:\n|^)\s*(?:\d+\.?\s*)?{re.escape(section_name)}\s*(?:\n|$)"
-                match = re.search(pattern, text_lower, re.IGNORECASE)
-                if match and match.start() < first_header_pos:
-                    first_header_pos = match.start()
+            # Find the absolute first position of any header found so far
+            for existing_content in sections.values():
+                pos = text.find(existing_content)
+                if pos != -1 and pos < first_header_pos:
+                    first_header_pos = pos
             
-            # Find earliest discovered header
-            for dh in discovered_headers:
-                if dh["start"] < first_header_pos:
-                    first_header_pos = dh["start"]
-            
-            # Extract text before the first header (limited to first 4k chars to avoid taking the whole paper)
+            # Text before the first header is likely metadata + Abstract
             pre_text = text[:first_header_pos].split('\n')
-            # Look for a significant block (skip title/authors if they are likely at the start)
-            # Find index where lines become long (paragraphs)
             abstract_lines = []
             found_block = False
             for line in pre_text:
                 line = line.strip()
                 if not line: continue
-                if len(line) > 60: # Threshold for a sentence/paragraph line
+                if len(line) > 60: # Assume the first dense paragraph is the abstract
                     found_block = True
                 if found_block:
                     abstract_lines.append(line)
             
             if abstract_lines:
-                sections["Abstract"] = "\n".join(abstract_lines[:30]) # Limit to ~30 lines
+                sections["Abstract"] = "\n".join(abstract_lines[:30])
         
         return sections
 
     def process_pdf(self, pdf_path: Union[Path, str], paper_id: str) -> dict[str, Any]:
         """
-        Extract text, detect sections.
-        
-        Args:
-            pdf_path: Path to the PDF file.
-            paper_id: Unique identifier for the paper.
-
-        Returns:
-            Dict with keys: paper_id, full_text, sections.
+        Orchestrates the extraction pipeline: text -> logical segmentation.
         """
         path = Path(pdf_path)
         full_text = self.extract_text(path)

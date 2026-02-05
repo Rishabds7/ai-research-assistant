@@ -118,70 +118,73 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
 
 
     return (
-        <Card className="mb-4">
-            <CardHeader className="pb-2">
+        <Card className="mb-6 border-[#F1E9D2] shadow-sm hover:shadow-md transition-shadow rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="pb-4 bg-[#FDFBF7]/50 border-b border-[#F1E9D2]/30">
                 <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-blue-500" />
-                        <CardTitle className="text-lg font-bold">{paper.filename}</CardTitle>
+                    <div className="flex items-center gap-3">
+                        <div className="bg-[#1A365D]/5 p-2 rounded-lg">
+                            <FileText className="h-6 w-6 text-[#1A365D]" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-xl font-bold text-[#1A365D] tracking-tight">{paper.filename}</CardTitle>
+                            {!paper.processed && (
+                                <div className="flex items-center gap-2 mt-1 text-[10px] text-blue-500 font-bold uppercase tracking-widest animate-pulse">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Deep Analysis in Progress...
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex gap-2">
-                        {!paper.processed && (
-                            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-md text-sm border border-blue-100">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Processing...
-                            </div>
-                        )}
-
+                    <div className="flex items-center gap-2">
                         {paper.processed && (
-                            <>
+                            <div className="flex bg-white border border-[#F1E9D2] p-1 rounded-xl shadow-sm">
                                 <Button
-                                    variant={showPdf ? "default" : "outline"}
+                                    variant="ghost"
                                     size="sm"
-                                    className={`gap-2 ${showPdf ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                                    className={`rounded-lg gap-2 text-xs font-semibold ${showPdf ? "bg-[#1A365D] text-white hover:bg-[#1A365D]" : "text-[#1A365D] hover:bg-[#F1E9D2]/30"}`}
                                     onClick={() => setShowPdf(!showPdf)}
                                 >
-                                    <Eye className="h-4 w-4" />
-                                    {showPdf ? "Hide PDF" : "View PDF"}
+                                    <Eye className="h-3.5 w-3.5" />
+                                    {showPdf ? "Hide" : "View"}
                                 </Button>
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
-                                    className="gap-2"
+                                    className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
                                     onClick={handleSummarize}
                                     disabled={isSumLoading}
                                 >
-                                    {isSumLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <List className="h-4 w-4" />}
+                                    {isSumLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <List className="h-3.5 w-3.5" />}
                                     Summarize
                                 </Button>
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
-                                    className="gap-2"
+                                    className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
                                     onClick={() => handleExtractMetadata('datasets')}
                                     disabled={isDsLoading}
                                 >
-                                    {isDsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+                                    {isDsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
                                     Datasets
                                 </Button>
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
-                                    className="gap-2"
+                                    className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
                                     onClick={() => handleExtractMetadata('licenses')}
                                     disabled={isLicLoading}
                                 >
-                                    {isLicLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
+                                    {isLicLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Award className="h-3.5 w-3.5" />}
                                     Licenses
                                 </Button>
-                            </>
+                            </div>
                         )}
                         <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={handleDelete}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            title="Delete Paper"
+                            className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remove Document"
                         >
                             <Trash2 className="h-4 w-4" />
                         </Button>
@@ -243,26 +246,26 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                 {/* Consolidated Metadata Section */}
                 <div className="border-t pt-4 mt-2 space-y-4">
                     {/* Status Row */}
-                    <div className="flex flex-wrap gap-4 text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-                        <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap gap-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-md border border-slate-100">
                             Status: {paper.processed ? (
                                 <span className="flex items-center gap-1 text-green-600 font-bold">
                                     <CheckCircle2 className="h-3 w-3" /> Ready
                                 </span>
                             ) : (
-                                <span className="flex items-center gap-1 text-blue-500 font-bold italic animate-pulse">
+                                <span className="flex items-center gap-1 text-[#1A365D] animate-pulse">
                                     <Loader2 className="h-3 w-3 animate-spin" /> Analyzing
                                 </span>
                             )}
                         </div>
                         {paper.metadata?.datasets && paper.metadata.datasets.length > 0 && (
-                            <div className="flex items-center gap-1 text-blue-600 font-bold">
+                            <div className="flex items-center gap-2 px-2 py-1 bg-[#1A365D]/5 text-[#1A365D] rounded-md border border-[#1A365D]/10">
                                 <Database className="h-3 w-3" />
                                 {(paper.metadata.datasets[0] === "None mentioned" || paper.metadata.datasets[0] === "Not Available / Present") ? 0 : paper.metadata.datasets.length} Datasets
                             </div>
                         )}
                         {paper.metadata?.licenses && paper.metadata.licenses.length > 0 && (
-                            <div className="flex items-center gap-1 text-purple-600 font-bold">
+                            <div className="flex items-center gap-2 px-2 py-1 bg-[#D4AF37]/10 text-[#D4AF37] rounded-md border border-[#D4AF37]/20">
                                 <Award className="h-3 w-3" />
                                 {(paper.metadata.licenses[0] === "None mentioned" || paper.metadata.licenses[0] === "Not Available / Present") ? 0 : paper.metadata.licenses.length} Licenses
                             </div>
@@ -273,21 +276,27 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     {((paper.metadata?.datasets?.length ?? 0) > 0 || (paper.metadata?.licenses?.length ?? 0) > 0) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {paper.metadata?.datasets && paper.metadata.datasets.length > 0 && paper.metadata.datasets[0] !== "None mentioned" && (
-                                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">DATASETS:</h4>
-                                    <ul className="text-xs space-y-1">
+                                <div className="bg-[#1A365D]/5 p-3 rounded-xl border border-[#1A365D]/10">
+                                    <h4 className="text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest mb-2 opacity-70">DATASETS:</h4>
+                                    <ul className="text-xs space-y-1.5">
                                         {paper.metadata.datasets.map((d, i) => (
-                                            <li key={i} className="text-slate-700 font-medium">• {d}</li>
+                                            <li key={i} className="text-slate-700 font-medium flex items-center gap-2">
+                                                <div className="h-1 w-1 bg-[#1A365D] rounded-full"></div>
+                                                {d}
+                                            </li>
                                         ))}
                                     </ul>
                                 </div>
                             )}
                             {paper.metadata?.licenses && paper.metadata.licenses.length > 0 && paper.metadata.licenses[0] !== "None mentioned" && (
-                                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">LICENSES:</h4>
-                                    <ul className="text-xs space-y-1">
+                                <div className="bg-[#D4AF37]/5 p-3 rounded-xl border border-[#D4AF37]/10">
+                                    <h4 className="text-[10px] font-extrabold text-[#D4AF37] uppercase tracking-widest mb-2 opacity-70">LICENSES:</h4>
+                                    <ul className="text-xs space-y-1.5">
                                         {paper.metadata.licenses.map((l, i) => (
-                                            <li key={i} className="text-slate-700 font-medium">• {l}</li>
+                                            <li key={i} className="text-slate-700 font-medium flex items-center gap-2">
+                                                <div className="h-1 w-1 bg-[#D4AF37] rounded-full"></div>
+                                                {l}
+                                            </li>
                                         ))}
                                     </ul>
                                 </div>
@@ -296,25 +305,25 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     )}
 
                     {/* Title and Authors */}
-                    <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-1">
-                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">TITLE:</h4>
-                            <p className={`text-sm font-bold leading-tight ${(!paper.title || paper.title === "Unknown") ? "text-slate-400 italic" : "text-slate-900"}`}>
+                    <div className="grid grid-cols-1 gap-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                        <div className="space-y-1.5">
+                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">TITLE:</h4>
+                            <p className={`text-sm font-bold leading-tight ${(!paper.title || paper.title === "Unknown") ? "text-slate-400 italic font-medium" : "text-[#1A365D]"}`}>
                                 {!paper.processed ? (
-                                    <span className="flex items-center gap-2 text-blue-500 italic font-medium">
+                                    <span className="flex items-center gap-2 text-slate-400 italic font-medium">
                                         <Loader2 className="h-3 w-3 animate-spin" />
-                                        Extracting from document...
+                                        Extracting...
                                     </span>
                                 ) : (paper.title || "Not Available")}
                             </p>
                         </div>
-                        <div className="space-y-1">
-                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AUTHORS:</h4>
-                            <p className={`text-sm leading-tight ${(!paper.authors || paper.authors === "Unknown") ? "text-slate-400 italic" : "text-slate-700"}`}>
+                        <div className="space-y-1.5 pt-3 border-t border-white shadow-[0_-1px_0_0_rgba(0,0,0,0.03)]">
+                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">AUTHORS:</h4>
+                            <p className={`text-sm leading-tight ${(!paper.authors || paper.authors === "Unknown") ? "text-slate-400 italic font-medium" : "text-slate-700 font-semibold"}`}>
                                 {!paper.processed ? (
-                                    <span className="flex items-center gap-2 text-blue-500 italic font-medium">
+                                    <span className="flex items-center gap-2 text-slate-400 italic font-medium">
                                         <Loader2 className="h-3 w-3 animate-spin" />
-                                        Identifying researchers...
+                                        Identifying...
                                     </span>
                                 ) : (paper.authors || "Not Available")}
                             </p>
@@ -324,44 +333,49 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
 
                 {/* Section Summaries with Accordion */}
                 {paper.section_summaries && paper.section_summaries.length > 0 && (
-                    <div className="space-y-3 pt-2">
+                    <div className="space-y-4 pt-6 border-t border-[#F1E9D2]/30 mt-4">
                         <button
                             onClick={() => setIsSummariesVisible(!isSummariesVisible)}
-                            className="w-full flex items-center justify-between group pb-1"
+                            className="w-full flex items-center justify-between group"
                         >
-                            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 group-hover:text-blue-600 transition-colors">
-                                <List className="h-4 w-4 text-blue-500" /> Section Summaries
+                            <h4 className="text-base font-bold text-[#1A365D] flex items-center gap-2 group-hover:text-[#D4AF37] transition-colors">
+                                <List className="h-5 w-5 text-[#D4AF37]" /> Deep Section Analysis
                             </h4>
-                            <div className="flex items-center gap-2 text-xs text-slate-400 font-normal">
-                                {isSummariesVisible ? 'Hide' : `Show (${paper.section_summaries.length} sections)`}
+                            <div className="flex items-center gap-2 text-xs text-slate-400 font-bold uppercase tracking-tight">
+                                {isSummariesVisible ? 'Collapse' : `Expand (${paper.section_summaries.length})`}
                                 {isSummariesVisible ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                             </div>
                         </button>
 
                         {isSummariesVisible && (
-                            <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                                 {[...paper.section_summaries]
                                     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
                                     .map(s => {
                                         const isExpanded = expandedSections[s.section_name] || false;
                                         return (
-                                            <div key={s.id} className="border rounded-lg overflow-hidden border-slate-200">
+                                            <div key={s.id} className={`border rounded-xl overflow-hidden transition-all ${isExpanded ? "border-[#D4AF37]/30 shadow-sm" : "border-slate-100"}`}>
                                                 <button
                                                     onClick={() => toggleSection(s.section_name)}
-                                                    className="w-full flex items-center justify-between p-3 text-left bg-white hover:bg-slate-50 transition-colors"
+                                                    className={`w-full flex items-center justify-between p-4 text-left transition-colors ${isExpanded ? "bg-[#D4AF37]/5" : "bg-white hover:bg-slate-50"}`}
                                                 >
-                                                    <span className="text-sm font-semibold text-slate-700 capitalize">
+                                                    <span className={`text-sm font-bold capitalize ${isExpanded ? "text-[#1A365D]" : "text-slate-600"}`}>
                                                         {s.section_name}
                                                     </span>
-                                                    {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                                                    {isExpanded ? <ChevronDown className="h-4 w-4 text-[#D4AF37]" /> : <ChevronRight className="h-4 w-4 text-slate-300" />}
                                                 </button>
                                                 {isExpanded && (
-                                                    <div className="p-3 bg-slate-50 border-t border-slate-200">
-                                                        <ul className="list-disc list-inside text-sm text-slate-600 space-y-1.5 ml-1">
+                                                    <div className="p-4 bg-white border-t border-[#D4AF37]/10">
+                                                        <ul className="space-y-3">
                                                             {s.summary.split(/•|\n-|\n\*/).map((point, i) => {
                                                                 const cleanPoint = point.replace(/^[^:]*:\s*/, '').trim();
                                                                 if (!cleanPoint) return null;
-                                                                return <li key={i} className="pl-1 -leading-tight">{cleanPoint}</li>;
+                                                                return (
+                                                                    <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed">
+                                                                        <span className="text-[#D4AF37] shrink-0 font-bold mt-0.5">◇</span>
+                                                                        <span>{cleanPoint}</span>
+                                                                    </li>
+                                                                );
                                                             })}
                                                         </ul>
                                                     </div>

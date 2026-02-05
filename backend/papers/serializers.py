@@ -1,5 +1,12 @@
+"""
+DATA SERIALIZERS
+Project: Research Assistant
+File: backend/papers/serializers.py
+
+Converts Database Models into JSON format for the Frontend API.
+"""
 from rest_framework import serializers
-from .models import Paper, Methodology, SectionSummary, GapAnalysis, TaskStatus
+from .models import Paper, Methodology, SectionSummary, TaskStatus
 
 class MethodologySerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,7 +43,3 @@ class TaskStatusSerializer(serializers.ModelSerializer):
         model = TaskStatus
         fields = ['task_id', 'task_type', 'status', 'result', 'error', 'created_at']
 
-class GapAnalysisSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = GapAnalysis
-        fields = '__all__'

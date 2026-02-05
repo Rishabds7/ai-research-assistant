@@ -1,5 +1,14 @@
 """
-Django settings for core project.
+PROJECT SETTINGS
+Project: Research Assistant
+File: backend/core/settings.py
+
+This is the central configuration file for the Django backend.
+It defines:
+1. Database connections (Postgres).
+2. Third-party integrations (Celery, Redis).
+3. AI Provider settings (Gemini, Ollama).
+4. Security and Middleware policies.
 """
 
 import os
@@ -20,9 +29,12 @@ env_locations = [
     os.path.join(os.getcwd(), '.env'),
 ]
 for loc in env_locations:
-    if os.path.exists(loc):
-        environ.Env.read_env(loc)
-        break
+    try:
+        if os.path.exists(loc):
+            environ.Env.read_env(loc)
+            break
+    except Exception as e:
+        print(f"Warning: Could not read .env at {loc}: {e}")
 
 # Security
 SECRET_KEY = env('SECRET_KEY', default='django-insecure-fallback-key-for-migrations-only')
@@ -78,9 +90,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# Database
+# Database Configuration - PostgreSQL with pgvector support
+# Using the standard Django dictionary format for clear demonstration
 DATABASES = {
-    'default': env.db('DATABASE_URL', default='sqlite:///db.sqlite3')
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env('DB_NAME', default='research_assistant'),
+        'USER': env('DB_USER', default='postgres'),
+        'PASSWORD': env('DB_PASSWORD', default='postgrespassword'),
+        'HOST': env('DB_HOST', default='research_db'),
+        'PORT': env('DB_PORT', default='5432'),
+    }
 }
 
 # Password validation

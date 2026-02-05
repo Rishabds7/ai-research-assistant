@@ -1,3 +1,14 @@
+/**
+ * MAIN LANDING PAGE
+ * Project: Research Assistant
+ * File: frontend/src/app/page.tsx
+ * 
+ * This is the primary entry point for the user interface.
+ * It coordinates:
+ * 1. File Uploading (parallel processing).
+ * 2. Navigation between 'Papers' (list view) and 'Review' (side-by-side reading).
+ * 3. Bulk actions (Delete All).
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -37,7 +48,7 @@ export default function Home() {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
 
-      // Filter out files that are already in the list
+      // Duplicate Check: Prevents redundant AI processing and DB storage.
       const newFiles = selectedFiles.filter(file =>
         !papers.some(p => p.filename === file.name)
       );
@@ -51,9 +62,13 @@ export default function Home() {
         return;
       }
 
+      // PARALLEL UPLOAD LOGIC:
+      // We use Promise.all to trigger multiple uploads at once.
+      // 1. Update the 'uploadingCount' to show a Spinner in the button.
+      // 2. Map each file to an uploadPaper() call.
+      // 3. Each successful upload adds a 'placeholder' paper to the state with its 'uploadTaskId'.
       setUploadingCount(prev => prev + newFiles.length);
 
-      // Upload in parallel
       await Promise.all(newFiles.map(async (file) => {
         try {
           const res = await uploadPaper(file);
@@ -83,22 +98,37 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">AI Research Assistant</h1>
+    <main className="min-h-screen bg-[var(--background)] p-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex justify-between items-center bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-[#F1E9D2] shadow-sm">
+          <div className="flex items-center gap-6">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-[#D4AF37] to-[#1A365D] rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              <img
+                src="/logo.png"
+                alt="PaperDigest AI Logo"
+                className="relative h-16 w-16 object-contain logo-animate logo-glow rounded-xl"
+              />
+            </div>
+            <div>
+              <h1 className="text-4xl font-extrabold tracking-tight text-[#1A365D]">
+                PaperDigest <span className="text-[#D4AF37]">AI</span>
+              </h1>
+              <p className="text-slate-500 font-medium tracking-wide">
+                Synthesizing deep research into actionable insights
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {papers.length > 0 && (
               <Button
-                variant="destructive"
+                variant="ghost"
                 onClick={handleDeleteAll}
-                className="bg-red-50 hover:bg-red-100 text-red-600 border-red-100"
+                className="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                title="Delete all papers"
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete All
+                <Trash2 className="h-5 w-5" />
               </Button>
             )}
 
@@ -112,17 +142,18 @@ export default function Home() {
             />
             <Button
               onClick={handleButtonClick}
-              disabled={uploadingCount > 10} // Just a safety latch
+              disabled={uploadingCount > 10}
+              className="bg-[#1A365D] hover:bg-[#2C5282] text-white px-6 py-6 rounded-xl shadow-lg shadow-blue-900/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               {uploadingCount > 0 ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading {uploadingCount}...
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Processing {uploadingCount}...
                 </>
               ) : (
                 <>
-                  <UploadCloud className="mr-2 h-4 w-4" />
-                  Upload PDFs
+                  <UploadCloud className="mr-2 h-5 w-5" />
+                  <span className="text-lg">Upload Documents</span>
                 </>
               )}
             </Button>
@@ -130,15 +161,32 @@ export default function Home() {
         </div>
 
         <Tabs defaultValue="papers" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="papers">📄 Papers</TabsTrigger>
-            <TabsTrigger value="review">📋 Review</TabsTrigger>
+          <TabsList className="flex w-full max-w-md mx-auto bg-[#F1E9D2]/30 p-1 rounded-xl mb-8 border border-[#F1E9D2]/50">
+            <TabsTrigger
+              value="papers"
+              className="flex-1 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all"
+            >
+              📄 Documents
+            </TabsTrigger>
+            <TabsTrigger
+              value="review"
+              className="flex-1 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all"
+            >
+              📋 AI Review
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="papers" className="space-y-4">
+          <TabsContent value="papers" className="space-y-6">
             {papers.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-lg border border-dashed border-slate-300">
-                <p className="text-slate-500">No papers uploaded yet.</p>
+              <div
+                className="text-center py-32 bg-[var(--card-yellow)] rounded-3xl border-2 border-dashed border-[#F1E9D2] group hover:border-[#D4AF37] transition-colors cursor-pointer"
+                onClick={handleButtonClick}
+              >
+                <div className="bg-white p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                  <UploadCloud className="h-8 w-8 text-[#1A365D]" />
+                </div>
+                <h3 className="text-xl font-semibold text-[#1A365D]">No documents yet</h3>
+                <p className="text-slate-500 mt-2">Upload your research PDFs to begin AI analysis</p>
               </div>
             ) : (
               papers.map((paper) => (
