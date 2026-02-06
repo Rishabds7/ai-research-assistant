@@ -151,6 +151,12 @@ REST_FRAMEWORK = {
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
 CORS_ALLOW_CREDENTIALS = True
+# Explicitly allow the custom session header needed for isolation
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'x-session-id',
+    'content-disposition',
+]
 
 # Allow embedding PDFs in iframes
 X_FRAME_OPTIONS = 'SAMEORIGIN'
