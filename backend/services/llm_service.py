@@ -545,18 +545,25 @@ class OllamaLLMService:
 
     # Complete implementation matching GeminiLLMService
     def extract_paper_info(self, context: str) -> dict[str, str]:
-        prompt = f"""Extract the title and authors from this research paper.
-
-Return ONLY a JSON object with this exact structure:
-{{
-    "title": "Full paper title",
-    "authors": ["Author One", "Author Two", "Author Three"]
-}}
-
-If you cannot find the information, use "Unknown".
-
-Text:
-{context[:5000]}"""
+        prompt = f"""Analyze the provided text to identify its document type, title, and authors.
+        
+        Task 1: Classify the document. Is it a "Research Paper" (academic, technical, scientific)?
+        If NO (e.g., news article, bank statement, novel, slide deck):
+          - Set "title" to: "NON-RESEARCH: [Original Title]"
+          - Set "authors" to: ["N/A"]
+        
+        Task 2: If YES, extract the full title and author list.
+        
+        Return ONLY a JSON object:
+        {{
+            "title": "Title String",
+            "authors": ["Author 1", "Author 2"]
+        }}
+        
+        If info is found but ambiguous, make your best guess.
+        
+        Text Snippet:
+        {context[:5000]}"""
         return _parse_json_safe(self._generate(prompt), {"title": "Unknown", "authors": ["Unknown"]})
     
     def extract_datasets(self, context: str) -> list[str]:
