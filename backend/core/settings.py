@@ -163,6 +163,6 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 # Custom settings for LLM services
 LLM_PROVIDER = env('LLM_PROVIDER', default='ollama')
 GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
-GEMINI_MODEL = env('GEMINI_MODEL', default='gemini-2.0-flash-lite')
+GEMINI_MODEL = env('GEMINI_MODEL', default='gemini-2.0-flash')
 OLLAMA_HOST = env('OLLAMA_HOST', default='http://localhost:11434')
 OLLAMA_MODEL = env('OLLAMA_MODEL', default='llama3')
