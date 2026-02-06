@@ -90,7 +90,7 @@ anced Search & RAG
 
 #### AI Task Orchestration
 
-```
+```text
 PDF Upload → Celery Worker → PDFProcessor → LLM (Gemini/Ollama) → EmbeddingService → PostgreSQL
 ```
 
@@ -102,7 +102,7 @@ PDF Upload → Celery Worker → PDFProcessor → LLM (Gemini/Ollama) → Embedd
 
 ## File Structure
 
-```
+```text
 research-assistant-mvp/
 ├── backend/            # Django Application
 │   ├── core/           # Project settings & Celery config
