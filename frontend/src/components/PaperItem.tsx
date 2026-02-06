@@ -26,6 +26,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
     const [isSummariesVisible, setIsSummariesVisible] = useState(true);
     const [showPdf, setShowPdf] = useState(false);
+    const [hasAlerted, setHasAlerted] = useState(false);
 
     // Sync task IDs from paper.task_ids if they become available or update
     useEffect(() => {
@@ -51,12 +52,11 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
 
     // AUTO-CLEANUP FOR REJECTIONS
     useEffect(() => {
-        if (processStatus === 'failed' && processError?.includes('REJECTED')) {
-            // Show alert (in a real app, use a Toast)
+        if (processStatus === 'failed' && processError?.includes('REJECTED') && !hasAlerted) {
+            setHasAlerted(true);
             const reason = processError.replace('REJECTED: ', '').replace('REJECTED:', '').trim();
             alert(`⚠️ DOCUMENT REJECTED\n\n${reason}\n\nPlease upload a valid research paper.`);
 
-            // Wait 1 second then auto-delete to keep the list clean
             const timer = setTimeout(async () => {
                 try {
                     await deletePaper(paper.id);
@@ -64,10 +64,10 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                 } catch (e) {
                     console.error("Auto-delete failed", e);
                 }
-            }, 1000);
+            }, 500);
             return () => clearTimeout(timer);
         }
-    }, [processStatus, processError, paper.id, onUpdate]);
+    }, [processStatus, processError, paper.id, onUpdate, hasAlerted]);
 
     // Poll for summarize
     const { status: sumStatus } = useTaskPoll(summarizeTaskId, () => {
@@ -130,8 +130,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const isDsLoading = !!datasetsTaskId && (dsStatus === 'idle' || dsStatus === 'pending' || dsStatus === 'running');
     const isLicLoading = !!licensesTaskId && (licStatus === 'idle' || licStatus === 'pending' || licStatus === 'running');
 
-    // Don't show the card at all if it's rejected (it will be deleted by the useEffect)
-    if (processStatus === 'failed' && processError?.includes('REJECTED')) {
+    // Don't show at all if rejected or cleaning up
+    if (hasAlerted || (processStatus === 'failed' && processError?.includes('REJECTED'))) {
         return null;
     }
 
@@ -146,18 +146,15 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                         <div>
                             {processStatus === 'failed' ? (
                                 <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <CardTitle className="text-xl font-bold text-red-700 tracking-tight">Document Rejected</CardTitle>
-                                        <span className="bg-red-200 text-red-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Invalid</span>
-                                    </div>
+                                    <CardTitle className="text-xl font-bold text-red-700 tracking-tight">Document Rejected</CardTitle>
                                     <p className="text-sm text-red-500 font-medium">
-                                        {processError || "This document does not meet the research paper criteria."}
+                                        {processError || "Invalid document structure."}
                                     </p>
                                 </div>
                             ) : (
                                 <>
                                     <CardTitle className="text-xl font-bold text-[#1A365D] tracking-tight">{paper.filename}</CardTitle>
-                                    {!paper.processed && (
+                                    {!paper.processed && processStatus !== 'failed' && (
                                         <div className="flex items-center gap-2 mt-1 text-[10px] text-blue-500 font-bold uppercase tracking-widest animate-pulse">
                                             <Loader2 className="h-3 w-3 animate-spin" />
                                             Deep Analysis in Progress...

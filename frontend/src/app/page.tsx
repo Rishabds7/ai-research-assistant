@@ -61,11 +61,7 @@ export default function Home() {
         return;
       }
 
-      // PARALLEL UPLOAD LOGIC:
-      // We use Promise.all to trigger multiple uploads at once.
-      // 1. Update the 'uploadingCount' to show a Spinner in the button.
-      // 2. Map each file to an uploadPaper() call.
-      // 3. Each successful upload adds a 'placeholder' paper to the state with its 'uploadTaskId'.
+      // PARALLEL UPLOAD LOGIC
       setUploadingCount(prev => prev + newFiles.length);
 
       await Promise.all(newFiles.map(async (file) => {
@@ -75,8 +71,11 @@ export default function Home() {
           setPapers((prev) => [newPaper, ...prev]);
         } catch (e: any) {
           console.error(`Upload failed: ${file.name}`, e);
-          alert(`Upload failed for ${file.name}`);
+          // Only alert if it's not a generic network error to avoid spam
+          if (e.response?.data?.error) alert(e.response.data.error);
+          else alert(`Connection issue while uploading ${file.name}.`);
         } finally {
+          // ENSURE COUNTER ALWAYS DECREMENTS
           setUploadingCount(prev => Math.max(0, prev - 1));
         }
       }));
@@ -97,12 +96,12 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--background)] p-8">
+    <main className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         <div className="flex justify-between items-center bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-[#F1E9D2] shadow-sm">
           <div className="flex items-center gap-6">
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-[#D4AF37] to-[#1A365D] rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              <div className="absolute -inset-1 bg-linear-to-r from-[#D4AF37] to-[#1A365D] rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
               <img
                 src="/logo.png"
                 alt="PaperDigest AI Logo"
@@ -178,7 +177,7 @@ export default function Home() {
           <TabsContent value="papers" className="space-y-6">
             {papers.length === 0 ? (
               <div
-                className="text-center py-32 bg-[var(--card-yellow)] rounded-3xl border-2 border-dashed border-[#F1E9D2] group hover:border-[#D4AF37] transition-colors cursor-pointer"
+                className="text-center py-32 bg-card-yellow rounded-3xl border-2 border-dashed border-[#F1E9D2] group hover:border-[#D4AF37] transition-colors cursor-pointer"
                 onClick={handleButtonClick}
               >
                 <div className="bg-white p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
