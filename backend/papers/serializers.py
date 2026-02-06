@@ -7,6 +7,7 @@ Converts Database Models into JSON format for the Frontend API.
 """
 from rest_framework import serializers
 from .models import Paper, Methodology, SectionSummary, TaskStatus
+import json
 
 class MethodologySerializer(serializers.ModelSerializer):
     class Meta:
@@ -22,14 +23,49 @@ class PaperListSerializer(serializers.ModelSerializer):
     """Lighter serializer for list views."""
     methodology = MethodologySerializer(read_only=True)
     section_summaries = SectionSummarySerializer(many=True, read_only=True)
+    authors = serializers.SerializerMethodField()
+    metadata = serializers.SerializerMethodField()
     
     class Meta:
         model = Paper
         fields = ['id', 'filename', 'file', 'uploaded_at', 'processed', 'methodology', 'section_summaries', 'metadata', 'task_ids', 'title', 'authors', 'notes', 'global_summary']
+    
+    def get_authors(self, obj):
+        """Format authors as clean text instead of JSON"""
+        if not obj.authors or obj.authors == 'Unknown':
+            return obj.authors
+        try:
+            # If it's a JSON array, convert to comma-separated string
+            if isinstance(obj.authors, str) and obj.authors.startswith('['):
+                authors_list = json.loads(obj.authors)
+                if isinstance(authors_list, list):
+                    return ', '.join(authors_list)
+        except (json.JSONDecodeError, ValueError):
+            pass
+        return obj.authors
+    
+    def get_metadata(self, obj):
+        """Ensure metadata always has the expected structure with arrays"""
+        metadata = obj.metadata if obj.metadata else {}
+        
+        # Ensure datasets and licenses are always arrays
+        result = {
+            'datasets': metadata.get('datasets', []) if isinstance(metadata.get('datasets'), list) else [],
+            'licenses': metadata.get('licenses', []) if isinstance(metadata.get('licenses'), list) else []
+        }
+        
+        # Include any other metadata fields
+        for key, value in metadata.items():
+            if key not in ['datasets', 'licenses']:
+                result[key] = value
+        
+        return result
 
 class PaperDetailSerializer(serializers.ModelSerializer):
     methodology = MethodologySerializer(read_only=True)
     section_summaries = SectionSummarySerializer(many=True, read_only=True)
+    authors = serializers.SerializerMethodField()
+    metadata = serializers.SerializerMethodField()
     
     class Meta:
         model = Paper
@@ -37,6 +73,37 @@ class PaperDetailSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'filename': {'read_only': True}
         }
+    
+    def get_authors(self, obj):
+        """Format authors as clean text instead of JSON"""
+        if not obj.authors or obj.authors == 'Unknown':
+            return obj.authors
+        try:
+            # If it's a JSON array, convert to comma-separated string
+            if isinstance(obj.authors, str) and obj.authors.startswith('['):
+                authors_list = json.loads(obj.authors)
+                if isinstance(authors_list, list):
+                    return ', '.join(authors_list)
+        except (json.JSONDecodeError, ValueError):
+            pass
+        return obj.authors
+    
+    def get_metadata(self, obj):
+        """Ensure metadata always has the expected structure with arrays"""
+        metadata = obj.metadata if obj.metadata else {}
+        
+        # Ensure datasets and licenses are always arrays
+        result = {
+            'datasets': metadata.get('datasets', []) if isinstance(metadata.get('datasets'), list) else [],
+            'licenses': metadata.get('licenses', []) if isinstance(metadata.get('licenses'), list) else []
+        }
+        
+        # Include any other metadata fields
+        for key, value in metadata.items():
+            if key not in ['datasets', 'licenses']:
+                result[key] = value
+        
+        return result
 
 class TaskStatusSerializer(serializers.ModelSerializer):
     class Meta:

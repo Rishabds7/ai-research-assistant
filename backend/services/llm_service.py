@@ -125,9 +125,9 @@ def _parse_json_safe(raw: str, default: Any = None) -> Any:
 
 def clean_llm_summary(text: str) -> str:
     """
-    DISCLAIMER REMOVAL.
-    Removes LLM meta-talk (e.g., 'Summary of the introduction section...') 
-    to provide a clean, professional bulleted result.
+    Aggressively removes intro/outro meta-text from the LLM. 
+    Also normalizes content by removing leading bullets, numbers, and symbols.
+    The frontend will handle its own styling (e.g. ◇).
     """
     if not text:
         return ""
@@ -135,34 +135,165 @@ def clean_llm_summary(text: str) -> str:
     lines = text.split('\n')
     cleaned_lines = []
     
+    # Phrases usually added by LLMs that aren't part of the content
     meta_patterns = [
-        r"summarize only based on", r"i have summarized", r"here are the bullet points",
-        r"summarizing the introduction", r"summarizing the results"
+        r"^here (is|are) (the )?\d* (summary|bullet points?|key points?|points?)",
+        r"^(i('ve| have))? (summarized?|prepared|created|extracted)",
+        r"^based on (the |these )?",
+        r"^the (section|text|paper|following) (discusses?|presents?|describes?|contains?|outlines?|provides?)",
+        r"^this (section|document|paper|text) (discusses?|presents?|describes?|contains?|provides?)",
+        r"^in (this|the) section",
+        r"^summary of (the )?",
+        r"^bullet points?:",
+        r"^key (points?|findings?):",
+        r"^key findings?:",
+        r"provide only the bullet points",
+        r"^as requested",
+        r"^following (is|are)",
+        r"^below (is|are)",
+        r"^sure, here",
+        r"^i have extracted",
+        r"^certainly",
+        r"^(here|below) is the list",
+        r"^(the|following) bullet points? outline"
     ]
     
     for line in lines:
-        cleaned_line = line
-        # Remove noisy "Note: ..." suffixes added by some local models
+        cleaned_line = line.strip()
+        
+        # Skip empty lines
+        if not cleaned_line:
+            continue
+            
+        # Remove standard meta-note suffixes (e.g., "Note: this is from page 4")
         if "Note:" in cleaned_line:
             parts = cleaned_line.split("Note:", 1)
+            # If the part before "Note:" is meaningful, keep it, otherwise skip the line
             if parts[0].strip() and len(parts[0].strip()) > 10:
                 cleaned_line = parts[0].strip()
             else:
                 continue
-
-        stripped = cleaned_line.strip().lower()
-        if not stripped: continue
-            
+        
+        # Check if line is meta-text
         is_meta = False
+        stripped_lower = cleaned_line.lower()
+        
         for pattern in meta_patterns:
-            if re.search(pattern, stripped):
+            if re.search(pattern, stripped_lower):
                 is_meta = True
                 break
         
-        if not is_meta:
-            cleaned_lines.append(cleaned_line)
+        # Only keep lines that aren't meta-text and contain actual content
+        if not is_meta and len(cleaned_line) > 5:
+            # STRIP LEADING BULLETS/NUMBERS (-, •, *, 1., etc.)
+            # The system will add its own beautiful bullet symbols in the UI.
+            # This ensures we don't get double bullets like "◇ - Point"
+            content = re.sub(r"^[ \t]*([•\-*–—\d\.]+[ \t]*)+", "", cleaned_line).strip()
+            if content and len(content) > 3:
+                cleaned_lines.append(content)
             
     return '\n'.join(cleaned_lines)
+
+
+def _extract_license_snippets(text: str) -> list[str]:
+    """
+    Heuristic snippet finder to locate license/copyright info across the WHOLE paper.
+    Returns a list of relevant text chunks with context.
+    """
+    # Expanded Keywords and Patterns for stronger detection
+    keywords = [
+        r"licensed? under", r"copyright", r"permission", 
+        r"creative commons", r"creativecommons\.org", 
+        r"CC[- ]?BY", r"CC[- ]?0", r"CC[- ]?SA", r"CC[- ]?NC",
+        r"MIT license", r"Apache[- ]?2\.0", r"GPL", r"BSD", r"MPL", r"LGPL", r"AGPL",
+        r"code availability", r"data availability",
+        r"acknowledgments", r"funding",
+        r"figure", r"fig\.", r"caption", 
+        r"reproduced from", r"adapted from", 
+        r"permission granted", r"©",
+        r"distribution", r"terms of use", r"proprietary"
+    ]
+    
+    combined_pattern = "|".join(keywords)
+    matches = list(re.finditer(combined_pattern, text, re.IGNORECASE))
+    
+    if not matches:
+        return []
+        
+    snippets = []
+    # Increased context size to capture headers and citations
+    CONTEXT_SIZE = 800
+    
+    # Merge overlapping ranges
+    ranges = []
+    for m in matches:
+        start = max(0, m.start() - CONTEXT_SIZE)
+        end = min(len(text), m.end() + CONTEXT_SIZE)
+        ranges.append((start, end))
+        
+    ranges.sort()
+    merged = []
+    if ranges:
+        curr_start, curr_end = ranges[0]
+        for start, end in ranges[1:]:
+            if start < curr_end:  # Overlap
+                curr_end = max(curr_end, end)
+            else:
+                merged.append((curr_start, curr_end))
+                curr_start, curr_end = start, end
+        merged.append((curr_start, curr_end))
+    
+    for start, end in merged:
+        snippet = text[start:end].replace("\n", " ").strip()
+        snippets.append(snippet)
+        
+    return snippets[:15]
+
+
+def _extract_dataset_snippets(text: str) -> list[str]:
+    """
+    Heuristic snippet finder to locate dataset/source info across the WHOLE paper.
+    """
+    keywords = [
+        r"dataset", r"benchmark", r"corpus", r"evaluation set",
+        r"ImageNet", r"COCO", r"MNIST", r"CIFAR", r"SQuAD", r"GLUE",
+        r"MIMIC", r"ChestX-ray", r"Common Crawl", r"Wikipedia",
+        r"data availability", r"we use the", r"downloaded from",
+        r"available at", r"podcasts?", r"newsletters?",
+        r"experimental setup", r"data collection"
+    ]
+    combined_pattern = "|".join(keywords)
+    matches = list(re.finditer(combined_pattern, text, re.IGNORECASE))
+    
+    if not matches:
+        return []
+        
+    snippets = []
+    CONTEXT_SIZE = 800
+    
+    ranges = []
+    for m in matches:
+        start = max(0, m.start() - CONTEXT_SIZE)
+        end = min(len(text), m.end() + CONTEXT_SIZE)
+        ranges.append((start, end))
+        
+    ranges.sort()
+    merged = []
+    if ranges:
+        curr_start, curr_end = ranges[0]
+        for start, end in ranges[1:]:
+            if start < curr_end:
+                curr_end = max(curr_end, end)
+            else:
+                merged.append((curr_start, curr_end))
+                curr_start, curr_end = start, end
+        merged.append((curr_start, curr_end))
+    
+    for start, end in merged:
+        snippet = text[start:end].replace("\n", " ").strip()
+        snippets.append(snippet)
+        
+    return snippets[:15]
 
 
 class GeminiLLMService:
@@ -172,7 +303,7 @@ class GeminiLLMService:
     """
     def __init__(self) -> None:
         genai.configure(api_key=GEMINI_API_KEY)
-        self.model = genai.GenerativeModel("gemini-1.5-flash-latest")
+        self.model = genai.GenerativeModel(GEMINI_MODEL)
 
     def _generate(self, prompt: str) -> str:
         """
@@ -192,35 +323,161 @@ class GeminiLLMService:
         Uses first 10,000 characters to extract Title and Authors.
         Academic titles are usually prominent in the first few lines of raw text.
         """
-        prompt = f"Extract Title and Authors from this paper text. Return ONLY JSON: {{'title': '...', 'authors': '...'}}\n\nText:\n{context[:10000]}"
+        prompt = f"""Extract the title and authors from this research paper.
+
+Return ONLY a JSON object with this exact structure:
+{{
+    "title": "Full paper title",
+    "authors": ["Author One", "Author Two", "Author Three"]
+}}
+
+If you cannot find the information, use "Unknown".
+
+Text:
+{context[:10000]}"""
         raw = self._generate(prompt)
-        return _parse_json_safe(raw, {"title": "Unknown", "authors": "Unknown"})
+        return _parse_json_safe(raw, {"title": "Unknown", "authors": ["Unknown"]})
 
     def extract_datasets(self, context: str) -> list[str]:
         """
-        Specialized extraction for RAG-style benchmark tracking.
-        Uses contextual clues like 'Evaluated on' or 'Trained using'.
+        Uses snippet-based isolation to find data sources. 
+        Better than full-text extraction for long documents as it avoids dilution.
         """
-        prompt = f"List all datasets mentioned in this text as a JSON list. If none, return [].\n\nText:\n{context[:40000]}"
+        snippets = _extract_dataset_snippets(context)
+        if not snippets: return []
+        
+        snippets_text = "\n---\n".join(snippets)
+        prompt = f"""Extract ALL specific data sources and datasets mentioned in these snippets from a research paper.
+
+Look for:
+- Standard Benchmarks (ImageNet, SQuAD, etc.)
+- Named local/custom datasets
+- Alternative sources like specific podcasts, newsletters, or web sources.
+
+Rules:
+1. Return ONLY a JSON array of specific names: ["Name1", "Name2", ...]
+2. Be specific (e.g., "ImageNet-1k" not just "ImageNet").
+3. Include names of podcasts/newsletters if explicitly mentioned.
+4. If no specific sources found, return [].
+
+Snippets:
+{snippets_text}"""
         raw = self._generate(prompt)
-        return _parse_json_safe(raw, [])
+        result = _parse_json_safe(raw, [])
+        return result if result else []
 
     def extract_licenses(self, context: str) -> list[str]:
         """
-        Searches for open-source license phrases (MIT, Apache, CC).
+        Advanced multi-pass license identification. 
+        Scans SNIPPETS from the ENTIRE paper for maximum recall.
         """
-        prompt = f"List any licenses (MIT, Apache, CC, etc.) mentioned. Return JSON list.\n\nText:\n{context[:20000]}"
+        # 1. Snippet Finding (Heuristic Filter across full text)
+        snippets = _extract_license_snippets(context)
+        
+        # 2. Optimization: Return empty if no keywords found
+        if not snippets:
+            return []
+            
+        # 3. LLM Call with pure evidence
+        snippets_text = "\n---\n".join(snippets)
+        prompt = f"""You are a professional research librarian. Analyze these snippets from a research paper and identifying the exact software or content licenses mentioned.
+
+Rules:
+1. Return a JSON LIST of objects: [{{"license": "Exact Name", "evidence": "Quote from text"}}]
+2. LOOK for: MIT, Apache 2.0, Creative Commons (CC BY, CC0, etc.), GPL, BSD, etc.
+3. Check figure captions or footnotes for "Reproduced with permission" or "licensed under".
+4. If a license applies to a specific dataset (e.g. COCO: CC BY 4.0), specify that.
+5. If no explicit license is stated, return [].
+6. Deduplicate entries.
+
+Snippets:
+{snippets_text}
+
+Return ONLY JSON."""
+        
         raw = self._generate(prompt)
-        return _parse_json_safe(raw, [])
+        items = _parse_json_safe(raw, [])
+        
+        # 4. Deduplication logic
+        licenses = []
+        seen = set()
+        for item in items:
+            if isinstance(item, dict) and 'license' in item:
+                lic = item['license'].strip()
+                if lic and lic.lower() not in seen:
+                    licenses.append(lic)
+                    seen.add(lic.lower())
+            elif isinstance(item, str):
+                if item and item.lower() not in seen:
+                    licenses.append(item)
+                    seen.add(item.lower())
+                    
+        return licenses
 
     def summarize_sections(self, sections: dict[str, str]) -> dict[str, str]:
         """
-        Iterates through paper sections and creates concise summaries.
+        Maps paper sections to standardized academic sections and creates summaries.
+        Returns summaries in a fixed order with bullet points.
         """
+        # Standardized section mapping
+        STANDARD_SECTIONS = [
+            'Abstract',
+            'Introduction', 
+            'Background',
+            'Methodology',
+            'Experiments',
+            'Results',
+            'Conclusion',
+            'References'
+        ]
+        
+        # Section mapping keywords
+        SECTION_MAPPING = {
+            'Abstract': ['abstract', 'summary'],
+            'Introduction': ['introduction', 'intro', 'motivation'],
+            'Background': ['background', 'related work', 'literature review', 'prior work'],
+            'Methodology': ['methodology', 'method', 'approach', 'model', 'architecture', 'framework', 'technique', 'algorithm'],
+            'Experiments': ['experiment', 'evaluation', 'setup', 'implementation', 'analysis'],
+            'Results': ['result', 'finding', 'performance', 'discussion', 'observation'],
+            'Conclusion': ['conclusion', 'future work', 'limitation', 'summary'],
+            'References': ['reference', 'bibliography', 'citation']
+        }
+        
+        # Map paper sections to standard sections
+        mapped_sections = {}
+        for standard_section in STANDARD_SECTIONS:
+            mapped_content = []
+            keywords = SECTION_MAPPING[standard_section]
+            
+            for section_name, content in sections.items():
+                section_lower = section_name.lower()
+                if any(keyword in section_lower for keyword in keywords):
+                    mapped_content.append(content)
+            
+            if mapped_content:
+                mapped_sections[standard_section] = '\n\n'.join(mapped_content)
+        
+        # Generate summaries for each standard section
         summaries = {}
-        for name, text in sections.items():
-            prompt = f"Summarize this section into 3 detailed bullet points:\n\n### {name}\n{text[:12000]}"
-            summaries[name] = clean_llm_summary(self._generate(prompt))
+        for section_name, content in mapped_sections.items():
+            if section_name == 'References':
+                continue  # Skip references section
+                
+            prompt = f"""Summarize this {section_name} section from a research paper.
+
+REQUIREMENTS:
+1. Provide a comprehensive summary using 6-8 high-density bullet points.
+2. Cover all key findings, experimental results, and specific methodologies.
+3. Each point MUST be descriptive and factual.
+4. DO NOT include any introductory or meta text (like "Here is the summary").
+5. DO NOT start points with symbols like - or •; the system will add them.
+6. Provide ONLY the points, one per line.
+
+Section Content:
+{content[:15000]}"""
+            raw_summary = self._generate(prompt)
+            summaries[section_name] = clean_llm_summary(raw_summary)
+        
         return summaries
 
     def extract_methodology(self, context: str) -> dict[str, Any]:
@@ -237,9 +494,18 @@ class GeminiLLMService:
         Final synthesis step. Combines individual section insights into 
         a 'Global Summary' (TL;DR) for the reviewer dashboard.
         """
-        combined = "\n".join([f"{n}: {t}" for n, t in section_summaries.items()])
-        prompt = f"Based on these summaries, provide a final 5-bullet global synthesis of the paper.\n\nSummaries:\n{combined}"
-        return self._generate(prompt).strip()
+        combined = "\n".join([f"{n}:\n{t}" for n, t in section_summaries.items()])
+        prompt = f"""Synthesize these section summaries into a comprehensive final overview of the paper.
+
+REQUIREMENTS:
+1. Provide 5-8 powerful, high-impact bullet points.
+2. Synthesize the core contribution, the novel methodology, the key results, and the broader impact.
+3. DO NOT include any introductory text.
+4. Provide ONLY the points, one per line. No symbols or leading numbers.
+
+Summaries:
+{combined}"""
+        return clean_llm_summary(self._generate(prompt))
 
 
 class OllamaLLMService:
@@ -262,33 +528,150 @@ class OllamaLLMService:
             "prompt": prompt,
             "system": system,
             "stream": False,
-            "options": {"temperature": 0.1, "num_ctx": 4096}
+            "options": {
+                "temperature": 0.1, 
+                "num_ctx": 16384  # Increased for research papers
+            }
         }
         try:
-            resp = requests.post(url, json=payload, timeout=120)
+            resp = requests.post(url, json=payload, timeout=180)
             resp.raise_for_status()
             return resp.json().get("response", "")
         except Exception as e:
             logger.error(f"Ollama error: {e}")
             return ""
 
-    # (Implementation for Paper Info, Datasets, etc. would mirror the Gemini logic 
-    # but use self._generate. For brevity in this code view, 
-    # we'll assume the same structure as GeminiLLMService)
+    # Complete implementation matching GeminiLLMService
     def extract_paper_info(self, context: str) -> dict[str, str]:
-        prompt = f"Extract Title and Authors. Return ONLY JSON.\n\nText:\n{context[:5000]}"
-        return _parse_json_safe(self._generate(prompt), {"title": "Unknown", "authors": "Unknown"})
+        prompt = f"""Extract the title and authors from this research paper.
+
+Return ONLY a JSON object with this exact structure:
+{{
+    "title": "Full paper title",
+    "authors": ["Author One", "Author Two", "Author Three"]
+}}
+
+If you cannot find the information, use "Unknown".
+
+Text:
+{context[:5000]}"""
+        return _parse_json_safe(self._generate(prompt), {"title": "Unknown", "authors": ["Unknown"]})
+    
+    def extract_datasets(self, context: str) -> list[str]:
+        snippets = _extract_dataset_snippets(context)
+        if not snippets: return []
+        
+        snippets_text = "\n---\n".join(snippets)
+        prompt = f"""Extract ALL specific data sources and datasets from these paper snippets.
+Return ONLY a JSON array of exact names: ["Name1", "Name2", ...]
+If none found, return [].
+
+Snippets:
+{snippets_text}"""
+        raw = self._generate(prompt)
+        return _parse_json_safe(raw, [])
+    
+    def extract_licenses(self, context: str) -> list[str]:
+        # 1. Scan full text for license snippets
+        snippets = _extract_license_snippets(context)
+        if not snippets: return []
+            
+        # 2. LLM Call with evidence extraction
+        snippets_text = "\n---\n".join(snippets)
+        prompt = f"""Analyze these snippets and identify exact licenses (MIT, Apache, CC, etc.).
+Return a JSON LIST of objects: [{{"license": "Name", "evidence": "Quote"}}]
+Return ONLY JSON.
+
+Snippets:
+{snippets_text}"""
+        raw = self._generate(prompt)
+        items = _parse_json_safe(raw, [])
+        
+        licenses = []
+        seen = set()
+        for item in items:
+            if isinstance(item, dict) and 'license' in item:
+                lic = item['license'].strip()
+                if lic and lic.lower() not in seen:
+                    licenses.append(lic)
+                    seen.add(lic.lower())
+        return licenses
 
     def summarize_sections(self, sections: dict[str, str]) -> dict[str, str]:
+        """
+        Maps paper sections to standardized academic sections and creates summaries.
+        Returns summaries in a fixed order with bullet points.
+        """
+        # Standardized section mapping
+        STANDARD_SECTIONS = [
+            'Abstract',
+            'Introduction', 
+            'Background',
+            'Methodology',
+            'Experiments',
+            'Results',
+            'Conclusion',
+            'References'
+        ]
+        
+        # Section mapping keywords
+        SECTION_MAPPING = {
+            'Abstract': ['abstract', 'summary'],
+            'Introduction': ['introduction', 'intro', 'motivation'],
+            'Background': ['background', 'related work', 'literature review', 'prior work'],
+            'Methodology': ['methodology', 'method', 'approach', 'model', 'architecture', 'framework', 'technique', 'algorithm'],
+            'Experiments': ['experiment', 'evaluation', 'setup', 'implementation', 'analysis'],
+            'Results': ['result', 'finding', 'performance', 'discussion', 'observation'],
+            'Conclusion': ['conclusion', 'future work', 'limitation', 'summary'],
+            'References': ['reference', 'bibliography', 'citation']
+        }
+        
+        # Map paper sections to standard sections
+        mapped_sections = {}
+        for standard_section in STANDARD_SECTIONS:
+            mapped_content = []
+            keywords = SECTION_MAPPING[standard_section]
+            
+            for section_name, content in sections.items():
+                section_lower = section_name.lower()
+                if any(keyword in section_lower for keyword in keywords):
+                    mapped_content.append(content)
+            
+            if mapped_content:
+                mapped_sections[standard_section] = '\n\n'.join(mapped_content)
+        
+        # Generate summaries for each standard section
         summaries = {}
-        for name, text in sections.items():
-            prompt = f"Summarize this section in 3 bullets: {text[:8000]}"
-            summaries[name] = clean_llm_summary(self._generate(prompt))
+        for section_name, content in mapped_sections.items():
+            if section_name == 'References':
+                continue
+                
+            prompt = f"""Summarize this {section_name} section with 6-8 bullet points.
+Cover key findings, methods, and results.
+DO NOT include intro text or bullets symbols (- or •).
+Provide ONLY the points, one per line.
+
+Section Content:
+{content[:8000]}"""
+            raw_summary = self._generate(prompt)
+            summaries[section_name] = clean_llm_summary(raw_summary)
+        
         return summaries
+    
+    def extract_methodology(self, context: str) -> dict[str, Any]:
+        prompt = f"Extract methodology details (datasets, model, metrics, results, summary). Return ONLY JSON.\n\nText:\n{context[:6000]}"
+        raw = self._generate(prompt)
+        return _parse_json_safe(raw, {})
 
     def generate_global_summary(self, section_summaries: dict[str, str]) -> str:
-        combined = "\n".join(section_summaries.values())
-        return self._generate(f"Synthesize this into a 5-bullet TLDR: {combined}")
+        combined = "\n".join([f"{n}:\n{t}" for n, t in section_summaries.items()])
+        prompt = f"""Synthesize these summaries into a global overview of the paper with 6-8 high-impact points.
+DO NOT include intro text or bullet symbols.
+Provide ONLY the points, one per line.
+
+Summaries:
+{combined}"""
+        return clean_llm_summary(self._generate(prompt))
 
 
 class LLMService:

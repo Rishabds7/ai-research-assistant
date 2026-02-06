@@ -9,7 +9,7 @@
 version: '3.8'
 
 services:
-  db:
+  research_db:
     image: pgvector/pgvector:pg15
     environment:
       POSTGRES_DB: research_assistant
@@ -36,14 +36,17 @@ services:
     environment:
       - DEBUG=True
       - SECRET_KEY=django-insecure-docker-key
-      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/research_assistant
+      - DATABASE_URL=postgresql://postgres:postgrespassword@research_db:5432/research_assistant
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - LLM_PROVIDER=ollama
-      - OLLAMA_HOST=http://host.docker.internal:11434
+      - LLM_PROVIDER=gemini
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      # - OLLAMA_HOST=http://host.docker.internal:11434
+      # - OLLAMA_MODEL=llama3
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend
     depends_on:
-      - db
+      - research_db
       - redis
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -56,13 +59,16 @@ services:
       - ./backend:/app
     environment:
       - DEBUG=True
-      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/research_assistant
+      - DATABASE_URL=postgresql://postgres:postgrespassword@research_db:5432/research_assistant
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - LLM_PROVIDER=ollama
-      - OLLAMA_HOST=http://host.docker.internal:11434
+      - LLM_PROVIDER=gemini
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      # - OLLAMA_HOST=http://host.docker.internal:11434
+      # - OLLAMA_MODEL=llama3
     depends_on:
-      - db
+      - research_db
       - redis
     extra_hosts:
       - "host.docker.internal:host-gateway"

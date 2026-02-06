@@ -148,18 +148,17 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                                     <TableCell className="align-top py-6">
                                         {paper.global_summary ? (
                                             <ul className="text-xs space-y-3 text-slate-600">
-                                                {paper.global_summary.split(/\n|•|\*/).filter(p => {
-                                                    const clean = p.trim();
-                                                    if (!clean) return false;
-                                                    if (clean.toLowerCase().includes("here is a summary")) return false;
-                                                    if (clean.toLowerCase().includes("bullet points")) return false;
-                                                    if (clean.toLowerCase().includes("concise summary")) return false;
-                                                    if (clean.length < 5) return false;
+                                                {paper.global_summary.split(/\r?\n/).filter(p => {
+                                                    const clean = p.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim();
+                                                    if (!clean || clean.length < 5) return false;
+                                                    // Filter out common header leftovers
+                                                    if (clean.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return false;
                                                     return true;
                                                 }).map((point, i) => (
                                                     <li key={i} className="flex gap-3 leading-relaxed">
                                                         <span className="text-[#D4AF37] font-bold shrink-0">◇</span>
-                                                        <span>{point.trim()}</span>
+                                                        {/* Clean again for display */}
+                                                        <span>{point.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim()}</span>
                                                     </li>
                                                 ))}
                                             </ul>

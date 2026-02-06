@@ -19,10 +19,10 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         (!paper.section_summaries || paper.section_summaries.length === 0) ? (paper.task_ids?.summarize || null) : null
     );
     const [datasetsTaskId, setDatasetsTaskId] = useState<string | null>(
-        (!paper.metadata?.datasets) ? (paper.task_ids?.datasets || null) : null
+        (!paper.metadata?.datasets || paper.metadata.datasets.length === 0) ? (paper.task_ids?.datasets || null) : null
     );
     const [licensesTaskId, setLicensesTaskId] = useState<string | null>(
-        (!paper.metadata?.licenses) ? (paper.task_ids?.licenses || null) : null
+        (!paper.metadata?.licenses || paper.metadata.licenses.length === 0) ? (paper.task_ids?.licenses || null) : null
     );
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
     const [isSummariesVisible, setIsSummariesVisible] = useState(true);
@@ -36,10 +36,10 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         if (paper.task_ids?.summarize && (!paper.section_summaries || paper.section_summaries.length === 0)) {
             setSummarizeTaskId(paper.task_ids.summarize);
         }
-        if (paper.task_ids?.datasets && !paper.metadata?.datasets) {
+        if (paper.task_ids?.datasets && (!paper.metadata?.datasets || paper.metadata.datasets.length === 0)) {
             setDatasetsTaskId(paper.task_ids.datasets);
         }
-        if (paper.task_ids?.licenses && !paper.metadata?.licenses) {
+        if (paper.task_ids?.licenses && (!paper.metadata?.licenses || paper.metadata.licenses.length === 0)) {
             setLicensesTaskId(paper.task_ids.licenses);
         }
     }, [paper.task_ids, paper.section_summaries, paper.metadata, paper.processed, paper.uploadTaskId]);
@@ -87,6 +87,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const handleExtractMetadata = async (field: 'datasets' | 'licenses') => {
         try {
             const data = await extractMetadata(paper.id, field);
+            if (!data?.task_id) throw new Error("No task ID returned");
             if (field === 'datasets') setDatasetsTaskId(data.task_id);
             else setLicensesTaskId(data.task_id);
             // Update parent state so task_id is persisted if we switch tabs
@@ -258,46 +259,63 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 </span>
                             )}
                         </div>
-                        {paper.metadata?.datasets && paper.metadata.datasets.length > 0 && (
-                            <div className="flex items-center gap-2 px-2 py-1 bg-[#1A365D]/5 text-[#1A365D] rounded-md border border-[#1A365D]/10">
+                        {(datasetsTaskId || paper.task_ids?.datasets) && (
+                            <div className="flex items-center gap-2 px-2 py-1 bg-[#1A365D]/10 text-[#1A365D] rounded-md border border-[#1A365D]/20">
                                 <Database className="h-3 w-3" />
-                                {(paper.metadata.datasets[0] === "None mentioned" || paper.metadata.datasets[0] === "Not Available / Present") ? 0 : paper.metadata.datasets.length} Datasets
+                                {(!paper.metadata?.datasets?.length || paper.metadata.datasets[0] === "None mentioned") ? 0 : paper.metadata.datasets.length} Datasets
                             </div>
                         )}
-                        {paper.metadata?.licenses && paper.metadata.licenses.length > 0 && (
+                        {(licensesTaskId || paper.task_ids?.licenses) && (
                             <div className="flex items-center gap-2 px-2 py-1 bg-[#D4AF37]/10 text-[#D4AF37] rounded-md border border-[#D4AF37]/20">
                                 <Award className="h-3 w-3" />
-                                {(paper.metadata.licenses[0] === "None mentioned" || paper.metadata.licenses[0] === "Not Available / Present") ? 0 : paper.metadata.licenses.length} Licenses
+                                {(!paper.metadata?.licenses?.length || paper.metadata.licenses[0] === "None mentioned") ? 0 : paper.metadata.licenses.length} Licenses
                             </div>
                         )}
                     </div>
 
-                    {/* Metadata Results (Simple Lists) - Only show if data exists */}
-                    {((paper.metadata?.datasets?.length ?? 0) > 0 || (paper.metadata?.licenses?.length ?? 0) > 0) && (
+                    {/* Metadata Results (Simple Lists) - Only show if requested or loading */}
+                    {(datasetsTaskId || paper.task_ids?.datasets || licensesTaskId || paper.task_ids?.licenses) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {paper.metadata?.datasets && paper.metadata.datasets.length > 0 && paper.metadata.datasets[0] !== "None mentioned" && (
+                            {/* Datasets Box */}
+                            {(datasetsTaskId || paper.task_ids?.datasets) && (
                                 <div className="bg-[#1A365D]/5 p-3 rounded-xl border border-[#1A365D]/10">
                                     <h4 className="text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest mb-2 opacity-70">DATASETS:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {paper.metadata.datasets.map((d, i) => (
-                                            <li key={i} className="text-slate-700 font-medium flex items-center gap-2">
-                                                <div className="h-1 w-1 bg-[#1A365D] rounded-full"></div>
-                                                {d}
+                                        {(!paper.metadata?.datasets?.length || paper.metadata.datasets[0] === "None mentioned") ? (
+                                            <li className="text-slate-500 italic flex items-center gap-2">
+                                                <div className="h-1 w-1 bg-slate-300 rounded-full"></div>
+                                                None mentioned
                                             </li>
-                                        ))}
+                                        ) : (
+                                            paper.metadata.datasets.map((d: string, i: number) => (
+                                                <li key={i} className="text-slate-700 font-medium flex items-center gap-2">
+                                                    <div className="h-1 w-1 bg-[#1A365D] rounded-full"></div>
+                                                    {d}
+                                                </li>
+                                            ))
+                                        )}
                                     </ul>
                                 </div>
                             )}
-                            {paper.metadata?.licenses && paper.metadata.licenses.length > 0 && paper.metadata.licenses[0] !== "None mentioned" && (
-                                <div className="bg-[#D4AF37]/5 p-3 rounded-xl border border-[#D4AF37]/10">
+
+                            {/* Licenses Box */}
+                            {(licensesTaskId || paper.task_ids?.licenses) && (
+                                <div className="bg-[#D4AF37]/5 p-3 rounded-xl border border-[#D4AF37]/20">
                                     <h4 className="text-[10px] font-extrabold text-[#D4AF37] uppercase tracking-widest mb-2 opacity-70">LICENSES:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {paper.metadata.licenses.map((l, i) => (
-                                            <li key={i} className="text-slate-700 font-medium flex items-center gap-2">
-                                                <div className="h-1 w-1 bg-[#D4AF37] rounded-full"></div>
-                                                {l}
+                                        {(!paper.metadata?.licenses?.length || paper.metadata.licenses[0] === "None mentioned") ? (
+                                            <li className="text-[#D4AF37]/60 italic flex items-center gap-2">
+                                                <div className="h-1 w-1 bg-[#D4AF37]/30 rounded-full"></div>
+                                                {licStatus === 'running' ? "Searching..." : "None mentioned"}
                                             </li>
-                                        ))}
+                                        ) : (
+                                            paper.metadata.licenses.map((lic, i) => (
+                                                <li key={i} className="text-slate-600 flex items-center gap-2 font-medium">
+                                                    <div className="h-1 w-1 bg-[#D4AF37] rounded-full"></div>
+                                                    {lic}
+                                                </li>
+                                            ))
+                                        )}
                                     </ul>
                                 </div>
                             )}
@@ -367,9 +385,13 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                                 {isExpanded && (
                                                     <div className="p-4 bg-white border-t border-[#D4AF37]/10">
                                                         <ul className="space-y-3">
-                                                            {s.summary.split(/•|\n-|\n\*/).map((point, i) => {
-                                                                const cleanPoint = point.replace(/^[^:]*:\s*/, '').trim();
-                                                                if (!cleanPoint) return null;
+                                                            {s.summary.split(/\r?\n/).filter(Boolean).map((line, i) => {
+                                                                // Aggressive symbol stripping and header filtering
+                                                                const cleanPoint = line.replace(/^[ \t]*([•\-*–—\d\.]+[ \t]*)+/, '').trim();
+                                                                if (!cleanPoint || cleanPoint.length < 4) return null;
+                                                                // Filter out headers that might have slipped through
+                                                                if (cleanPoint.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return null;
+
                                                                 return (
                                                                     <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed">
                                                                         <span className="text-[#D4AF37] shrink-0 font-bold mt-0.5">◇</span>

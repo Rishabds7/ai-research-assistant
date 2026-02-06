@@ -89,7 +89,14 @@ def process_pdf_task(self, paper_id):
             llm = LLMService()
             info = llm.extract_paper_info(paper.full_text[:15000])
             paper.title = sanitize_text(info.get('title', 'Unknown'))
-            paper.authors = sanitize_text(info.get('authors', 'Unknown'))
+            
+            # Store authors as JSON string if it's a list, otherwise store as-is
+            authors_data = info.get('authors', 'Unknown')
+            if isinstance(authors_data, list):
+                import json
+                paper.authors = json.dumps(authors_data)
+            else:
+                paper.authors = sanitize_text(authors_data)
         except Exception as e:
             logger.error(f"Metadata error: {e}")
             
@@ -213,8 +220,8 @@ def extract_metadata_task(self, paper_id, field):
             context = paper.full_text[:12000] + "\n\n" + "\n\n".join(target_sections)[:30000]
             result = llm.extract_datasets(context)
         elif field == 'licenses':
-            context = paper.full_text[:5000] + paper.full_text[-5000:] # Licenses are at the ends
-            result = llm.extract_licenses(context)
+            # Pass full text to service - it uses smart snippet extraction (Head 20k + Tail 40k)
+            result = llm.extract_licenses(paper.full_text)
         else:
             raise ValueError(f"Unknown field: {field}")
             

@@ -22,7 +22,7 @@ torch==2.8.0
 numpy==1.24.3
 
 # LLM Integration
-google-generativeai==0.3.2
+google-generativeai==0.7.2
 requests==2.31.0
 
 # Excel Export
@@ -35,3 +35,4 @@ pillow==10.2.0
 
 # Development
 ipython==8.18.1
+gunicorn==21.2.0

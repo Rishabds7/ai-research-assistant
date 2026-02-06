@@ -16,7 +16,9 @@ A professional, full-stack AI research platform designed to synthesize complex a
 - **Technical Deep-Dives** - Specialized prompts for extracting technical methodologies, model architectures, and metrics.
 - **Metadata Tagging** - Automatic identification of research datasets and software licenses used in the study.
 
-### 🔍 Advanced Search & RAG
+### 🔍 Adv
+
+anced Search & RAG
 
 - **Semantic Search** - Search across your paper library using natural language, powered by vector embeddings.
 - **Side-by-Side Review** - Compare AI summaries directly alongside the original PDF text.
