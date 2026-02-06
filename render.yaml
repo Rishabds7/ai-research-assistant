@@ -66,14 +66,13 @@ services:
       - key: GEMINI_MODEL
         value: gemini-2.0-flash
 
-  # 4. REDIS (Key Value)
+  # 4. REDIS
   - type: redis
     name: research-redis
-    plan: free # Managed Redis Free tier
+    plan: free 
     ipAllowList: []
 
 databases:
   - name: research-db
-    databaseName: research_db
-    user: research_user
-    plan: Basic-512mb # Corrected from 'basic' to the specific flexible plan name
+    plan: Basic-1gb # Switched to verified flexible plan name
+    diskSizeGB: 1 # Required for flexible plans
