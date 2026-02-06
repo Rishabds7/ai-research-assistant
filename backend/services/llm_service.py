@@ -137,8 +137,7 @@ def clean_llm_summary(text: str) -> str:
     
     meta_patterns = [
         r"summarize only based on", r"i have summarized", r"here are the bullet points",
-        r"summarizing the introduction", r"summarizing the results", r"concise bullet-points",
-        r"summarizing the \".*\" section"
+        r"summarizing the introduction", r"summarizing the results"
     ]
     
     for line in lines:
@@ -155,27 +154,13 @@ def clean_llm_summary(text: str) -> str:
         if not stripped: continue
             
         is_meta = False
-        # Check explicit patterns
         for pattern in meta_patterns:
             if re.search(pattern, stripped):
                 is_meta = True
                 break
         
-        # Check for typical intro sentences ending in colons
-        if not is_meta and stripped.endswith(':') and ("summary" in stripped or "summarizing" in stripped or "here are" in stripped):
-            is_meta = True
-        
         if not is_meta:
-            # Aggressive multi-pass cleaning for LLM artifacts
-            line_val = cleaned_line.strip()
-            # 1. Remove all bold markers **
-            line_val = line_val.replace("**", "")
-            # 2. Remove leading bullets and numbering
-            line_val = re.sub(r'^[\s*•\-·]+', '', line_val)
-            line_val = re.sub(r'^\d+[\.\)]\s*', '', line_val)
-            
-            if line_val.strip():
-                cleaned_lines.append(line_val.strip())
+            cleaned_lines.append(cleaned_line)
             
     return '\n'.join(cleaned_lines)
 
