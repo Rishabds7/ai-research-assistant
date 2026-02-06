@@ -15,7 +15,6 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         !paper.processed ? (paper.uploadTaskId || null) : null
     );
     const [summarizeTaskId, setSummarizeTaskId] = useState<string | null>(
-
         (!paper.section_summaries || paper.section_summaries.length === 0) ? (paper.task_ids?.summarize || null) : null
     );
     const [datasetsTaskId, setDatasetsTaskId] = useState<string | null>(
@@ -44,18 +43,14 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         }
     }, [paper.task_ids, paper.section_summaries, paper.metadata, paper.processed, paper.uploadTaskId]);
 
-
-
     // Poll for initial processing
-    const { status: processStatus } = useTaskPoll(processTaskId, () => {
+    const { status: processStatus, error: processError } = useTaskPoll(processTaskId, () => {
         onUpdate();
         setProcessTaskId(null);
     });
 
-
     // Poll for summarize
     const { status: sumStatus } = useTaskPoll(summarizeTaskId, () => {
-
         onUpdate();
         setSummarizeTaskId(null);
     });
@@ -76,7 +71,6 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         try {
             const data = await extractAllSections(paper.id);
             setSummarizeTaskId(data.task_id);
-            // Update parent state so task_id is persisted if we switch tabs
             onUpdate();
         } catch (e) {
             console.error(e);
@@ -90,7 +84,6 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
             if (!data?.task_id) throw new Error("No task ID returned");
             if (field === 'datasets') setDatasetsTaskId(data.task_id);
             else setLicensesTaskId(data.task_id);
-            // Update parent state so task_id is persisted if we switch tabs
             onUpdate();
         } catch (e) {
             console.error(e);
@@ -117,35 +110,35 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const isDsLoading = !!datasetsTaskId && (dsStatus === 'idle' || dsStatus === 'pending' || dsStatus === 'running');
     const isLicLoading = !!licensesTaskId && (licStatus === 'idle' || licStatus === 'pending' || licStatus === 'running');
 
-
     return (
-        <Card className="mb-6 border-[#F1E9D2] shadow-sm hover:shadow-md transition-shadow rounded-2xl overflow-hidden bg-white">
+        <Card className={`mb-6 border-[#F1E9D2] shadow-sm hover:shadow-md transition-all rounded-2xl overflow-hidden ${processStatus === 'failed' ? 'bg-red-50/30 border-red-200' : 'bg-white'}`}>
             <CardHeader className="pb-4 bg-[#FDFBF7]/50 border-b border-[#F1E9D2]/30">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
-                        <div className="bg-[#1A365D]/5 p-2 rounded-lg">
-                            <FileText className="h-6 w-6 text-[#1A365D]" />
+                        <div className={`p-2 rounded-lg ${processStatus === 'failed' ? 'bg-red-100' : 'bg-[#1A365D]/5'}`}>
+                            {processStatus === 'failed' ? <X className="h-6 w-6 text-red-600" /> : <FileText className="h-6 w-6 text-[#1A365D]" />}
                         </div>
                         <div>
-                            {paper.processed === false && paper.uploadTaskId === 'failed' && paper.title?.startsWith("NON-RESEARCH") ? (
-                                <div className="text-red-600 font-bold flex items-center gap-2">
-                                    <span>⚠️ Rejected: Non-Academic Content</span>
+                            {processStatus === 'failed' ? (
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <CardTitle className="text-xl font-bold text-red-700 tracking-tight">Document Rejected</CardTitle>
+                                        <span className="bg-red-200 text-red-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Invalid</span>
+                                    </div>
+                                    <p className="text-sm text-red-500 font-medium">
+                                        {processError || "This document does not meet the research paper criteria."}
+                                    </p>
                                 </div>
                             ) : (
-                                <CardTitle className="text-xl font-bold text-[#1A365D] tracking-tight">{paper.filename}</CardTitle>
-                            )}
-
-                            {!paper.processed && !paper.uploadTaskId?.includes('failed') && (
-                                <div className="flex items-center gap-2 mt-1 text-[10px] text-blue-500 font-bold uppercase tracking-widest animate-pulse">
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                    Deep Analysis in Progress...
-                                </div>
-                            )}
-
-                            {paper.title?.startsWith("NON-RESEARCH") && (
-                                <p className="text-xs text-red-500 mt-1 font-medium">
-                                    Please upload a valid academic/technical research PDF.
-                                </p>
+                                <>
+                                    <CardTitle className="text-xl font-bold text-[#1A365D] tracking-tight">{paper.filename}</CardTitle>
+                                    {!paper.processed && (
+                                        <div className="flex items-center gap-2 mt-1 text-[10px] text-blue-500 font-bold uppercase tracking-widest animate-pulse">
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                            Deep Analysis in Progress...
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
@@ -266,28 +259,20 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <span className="flex items-center gap-1 text-green-600 font-bold">
                                     <CheckCircle2 className="h-3 w-3" /> Ready
                                 </span>
+                            ) : processStatus === 'failed' ? (
+                                <span className="flex items-center gap-1 text-red-600 font-bold">
+                                    <X className="h-3 w-3" /> Rejected
+                                </span>
                             ) : (
                                 <span className="flex items-center gap-1 text-[#1A365D] animate-pulse">
                                     <Loader2 className="h-3 w-3 animate-spin" /> Analyzing
                                 </span>
                             )}
                         </div>
-                        {(datasetsTaskId || paper.task_ids?.datasets) && (
-                            <div className="flex items-center gap-2 px-2 py-1 bg-[#1A365D]/10 text-[#1A365D] rounded-md border border-[#1A365D]/20">
-                                <Database className="h-3 w-3" />
-                                {(!paper.metadata?.datasets?.length || paper.metadata.datasets[0] === "None mentioned") ? 0 : paper.metadata.datasets.length} Datasets
-                            </div>
-                        )}
-                        {(licensesTaskId || paper.task_ids?.licenses) && (
-                            <div className="flex items-center gap-2 px-2 py-1 bg-[#D4AF37]/10 text-[#D4AF37] rounded-md border border-[#D4AF37]/20">
-                                <Award className="h-3 w-3" />
-                                {(!paper.metadata?.licenses?.length || paper.metadata.licenses[0] === "None mentioned") ? 0 : paper.metadata.licenses.length} Licenses
-                            </div>
-                        )}
                     </div>
 
                     {/* Metadata Results (Simple Lists) - Only show if requested or loading */}
-                    {(datasetsTaskId || paper.task_ids?.datasets || licensesTaskId || paper.task_ids?.licenses) && (
+                    {paper.processed && (datasetsTaskId || paper.task_ids?.datasets || licensesTaskId || paper.task_ids?.licenses) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Datasets Box */}
                             {(datasetsTaskId || paper.task_ids?.datasets) && (
@@ -336,34 +321,36 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     )}
 
                     {/* Title and Authors */}
-                    <div className="grid grid-cols-1 gap-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-                        <div className="space-y-1.5">
-                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">TITLE:</h4>
-                            <p className={`text-sm font-bold leading-tight ${(!paper.title || paper.title === "Unknown") ? "text-slate-400 italic font-medium" : "text-[#1A365D]"}`}>
-                                {!paper.processed ? (
-                                    <span className="flex items-center gap-2 text-slate-400 italic font-medium">
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                        Extracting...
-                                    </span>
-                                ) : (paper.title || "Not Available")}
-                            </p>
+                    {processStatus !== 'failed' && (
+                        <div className="grid grid-cols-1 gap-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                            <div className="space-y-1.5">
+                                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">TITLE:</h4>
+                                <p className={`text-sm font-bold leading-tight ${(!paper.title || paper.title === "Unknown") ? "text-slate-400 italic font-medium" : "text-[#1A365D]"}`}>
+                                    {!paper.processed ? (
+                                        <span className="flex items-center gap-2 text-slate-400 italic font-medium">
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                            Extracting...
+                                        </span>
+                                    ) : (paper.title || "Not Available")}
+                                </p>
+                            </div>
+                            <div className="space-y-1.5 pt-3 border-t border-white shadow-[0_-1px_0_0_rgba(0,0,0,0.03)]">
+                                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">AUTHORS:</h4>
+                                <p className={`text-sm leading-tight ${(!paper.authors || paper.authors === "Unknown") ? "text-slate-400 italic font-medium" : "text-slate-700 font-semibold"}`}>
+                                    {!paper.processed ? (
+                                        <span className="flex items-center gap-2 text-slate-400 italic font-medium">
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                            Identifying...
+                                        </span>
+                                    ) : (paper.authors || "Not Available")}
+                                </p>
+                            </div>
                         </div>
-                        <div className="space-y-1.5 pt-3 border-t border-white shadow-[0_-1px_0_0_rgba(0,0,0,0.03)]">
-                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">AUTHORS:</h4>
-                            <p className={`text-sm leading-tight ${(!paper.authors || paper.authors === "Unknown") ? "text-slate-400 italic font-medium" : "text-slate-700 font-semibold"}`}>
-                                {!paper.processed ? (
-                                    <span className="flex items-center gap-2 text-slate-400 italic font-medium">
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                        Identifying...
-                                    </span>
-                                ) : (paper.authors || "Not Available")}
-                            </p>
-                        </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Section Summaries with Accordion */}
-                {paper.section_summaries && paper.section_summaries.length > 0 && (
+                {paper.processed && paper.section_summaries && paper.section_summaries.length > 0 && (
                     <div className="space-y-4 pt-6 border-t border-[#F1E9D2]/30 mt-4">
                         <button
                             onClick={() => setIsSummariesVisible(!isSummariesVisible)}
@@ -399,10 +386,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                                     <div className="p-4 bg-white border-t border-[#D4AF37]/10">
                                                         <ul className="space-y-3">
                                                             {s.summary.split(/\r?\n/).filter(Boolean).map((line, i) => {
-                                                                // Aggressive symbol stripping and header filtering
                                                                 const cleanPoint = line.replace(/^[ \t]*([•\-*–—\d\.]+[ \t]*)+/, '').trim();
                                                                 if (!cleanPoint || cleanPoint.length < 4) return null;
-                                                                // Filter out headers that might have slipped through
                                                                 if (cleanPoint.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return null;
 
                                                                 return (

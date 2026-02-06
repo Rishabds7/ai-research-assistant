@@ -92,9 +92,14 @@ def process_pdf_task(self, paper_id):
             # REJECTION LOGIC
             if title.startswith("NON-RESEARCH"):
                 logger.warning(f"Rejecting non-research document: {paper.filename}")
-                paper.file.delete() # Delete the PDF file from storage
-                paper.delete()      # Delete the DB record
-                raise ValueError("This does not appear to be a valid research paper. Please upload an academic PDF.")
+                # We save the rejection status into the title so the UI can display it
+                paper.title = title
+                paper.processed = False
+                paper.save(update_fields=['title', 'processed'])
+                
+                # We don't delete immediately so the user can see the error in the UI
+                # They can delete it manually, or we could have a cleanup task
+                raise ValueError(f"REJECTED: This appears to be a {title.replace('NON-RESEARCH: ', '')}. Please upload a valid academic research PDF.")
 
             paper.title = title
             

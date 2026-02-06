@@ -342,17 +342,28 @@ class GeminiLLMService:
     def extract_paper_info(self, context: str) -> dict[str, str]:
         """
         Uses first 10,000 characters to extract Title and Authors.
-        Academic titles are usually prominent in the first few lines of raw text.
+        Includes strict classification to filter out resumes, manuals, and general documents.
         """
-        prompt = f"""Extract the title and authors from this research paper.
+        prompt = f"""Analyze the provided text and determine if it is a genuine academic or technical research paper.
 
-Return ONLY a JSON object with this exact structure:
+Verification Steps:
+1. Structural Check: Does it have standard academic sections (Abstract, Introduction, References, etc.)?
+2. Content Check: Is the tone technical/academic? Or is it a resume, slide deck, manual, or general article?
+3. Identity Check: Can you find a clear Title and a list of Authors/Researchers?
+
+If the document is NOT a research paper (e.g., it is a resume, bank statement, news article, or non-technical document):
+- Set "title" to: "NON-RESEARCH: [Brief Description of document type]"
+- Set "authors" to: ["N/A"]
+
+If it IS a research paper:
+- Extract the full, formal Title.
+- Extract the full list of Authors as a JSON array.
+
+Return ONLY a JSON object:
 {{
-    "title": "Full paper title",
-    "authors": ["Author One", "Author Two", "Author Three"]
+    "title": "Title String",
+    "authors": ["Author 1", "Author 2"]
 }}
-
-If you cannot find the information, use "Unknown".
 
 Text:
 {context[:10000]}"""
