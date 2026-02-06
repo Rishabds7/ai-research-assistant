@@ -109,9 +109,6 @@ class PDFProcessor:
         text_lower = text.lower()
         
         # Pass 1: Generic Numbered Headers
-        # Regex explanation:
-        # (?:\n|^) - Start of line
-        # ((?:\d+\.)*\d+\.?\s+([A-Z][A-Za-z\s]{3,60})) - Group 1: Whole header, Group 2: The text only
         generic_header_pat = r"(?:\n|^)((?:\d+\.)*\d+\.?\s+([A-Z][A-Za-z\s]{3,60}))\s*(?:\n|$)"
         matches = list(re.finditer(generic_header_pat, text))
         
@@ -130,7 +127,10 @@ class PDFProcessor:
 
         # Pass 2: Keyword-based matching for standard academic sections
         for section_name in self.SECTION_PATTERNS:
-            pattern = rf"(?:\n|^)\s*(?:\d+\.?\s*)?{re.escape(section_name)}\s*(?:\n|$)"
+            # IMPROVED REGEX: Matches "Abstract:", "Abstract.", "1. Abstract" 
+            # and crucially stops matching BEFORE the content starts, so inline content isn't lost.
+            # \b ensures we don't match "AbstractVector"
+            pattern = rf"(?:\n|^)\s*(?:\d+\.?\s*)?{re.escape(section_name)}\b[:.]?\s*"
             match = re.search(pattern, text_lower, re.IGNORECASE)
             
             if match:
@@ -140,7 +140,7 @@ class PDFProcessor:
                 # Look ahead for the next major keyword boundary
                 for other in self.SECTION_PATTERNS:
                     if other == section_name: continue
-                    p = rf"\n\s*(?:\d+\.?\s*)?{re.escape(other)}\s*(?:\n|$)"
+                    p = rf"\n\s*(?:\d+\.?\s*)?{re.escape(other)}\b[:.]?\s*"
                     m = re.search(p, text_lower[start:], re.IGNORECASE)
                     if m:
                         cand = start + m.start()
@@ -166,29 +166,61 @@ class PDFProcessor:
             if is_new:
                 sections[dh["title"]] = dh["content"]
 
-        # Pass 4: Fallback for Abstract (often at the top without a clear header word)
+        # Pass 4: Fallback for Abstract (Smart Identification)
         if "Abstract" not in sections:
-            first_header_pos = len(text)
-            # Find the absolute first position of any header found so far
-            for existing_content in sections.values():
-                pos = text.find(existing_content)
-                if pos != -1 and pos < first_header_pos:
-                    first_header_pos = pos
+            # Strategy: The abstract is usually the first significant block of text 
+            # before the "Introduction".
             
-            # Text before the first header is likely metadata + Abstract
-            pre_text = text[:first_header_pos].split('\n')
+            # Find where the next section starts (usually Introduction)
+            end_pos = len(text)
+            for existing_key, existing_content in sections.items():
+                if "intro" in existing_key.lower():
+                    pos = text.find(existing_content)
+                    if pos != -1 and pos < end_pos:
+                        end_pos = pos
+                        break
+            
+            # If no Introduction found, just take the first 4000 chars
+            if end_pos == len(text):
+                end_pos = min(len(text), 4000)
+            
+            candidate_text = text[:end_pos].strip()
+            
+            # Filter out metadata lines (emails, affiliations, dates) to find the "meat"
+            lines = candidate_text.split('\n')
             abstract_lines = []
-            found_block = False
-            for line in pre_text:
+            capture = False
+            
+            for line in lines:
                 line = line.strip()
-                if not line: continue
-                if len(line) > 60: # Assume the first dense paragraph is the abstract
-                    found_block = True
-                if found_block:
+                if len(line) < 4: continue
+                
+                # Heuristic: Abstract paragraphs usually don't have special chars or look like emails
+                if "@" in line or "University" in line or "IEEE" in line or "doi:" in line:
+                    continue
+                    
+                # Once we hit a nice long paragraph, assume it's the abstract
+                if len(line) > 100: 
+                    capture = True
+                
+                # Or if it explicitly starts with "Abstract" (but wasn't caught by regex due to formatting)
+                if line.lower().startswith("abstract"):
+                    capture = True
+                    line = line[8:].strip(" .:") # Remove the word "Abstract"
+                
+                if capture:
                     abstract_lines.append(line)
             
-            if abstract_lines:
-                sections["Abstract"] = "\n".join(abstract_lines[:30])
+            # If we found nothing good, just take the raw first chunk
+            if not abstract_lines:
+                # Last resort: Take the middle 50% of the pre-intro text, assuming top is title/authors
+                mid = len(lines) // 3
+                abstract_lines = lines[mid:]
+            
+            final_abstract = "\n".join(abstract_lines)
+            
+            if final_abstract:
+                sections["Abstract"] = final_abstract[:5000] # Cap it
         
         return sections
 
