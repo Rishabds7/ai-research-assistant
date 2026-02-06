@@ -3,7 +3,7 @@ services:
   - type: web
     name: research-assistant-frontend
     env: node
-    plan: free # $0/mo
+    plan: free 
     rootDir: frontend
     buildCommand: npm install && npm run build
     startCommand: npm start
@@ -11,14 +11,16 @@ services:
       - key: NEXT_PUBLIC_API_URL
         sync: false 
 
-  # 2. BACKEND (Django API) - Now lightweight enough for Free tier!
+  # 2. UNIFIED BACKEND (Django API + Celery Worker)
+  # Combined to stay on the $0 Free Tier
   - type: web
     name: research-assistant-backend
     env: python
-    plan: free # $0/mo
+    plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
-    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
+    # Runs both Celery (in background) and Gunicorn (in foreground)
+    startCommand: celery -A core worker -l info --concurrency 1 & gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -44,39 +46,12 @@ services:
       - key: GEMINI_MODEL
         value: gemini-2.0-flash
 
-  # 3. CELERY WORKER
-  - type: worker
-    name: research-worker
-    env: python
-    plan: free # $12/mo on standard but some users have free worker options. 
-    # NOTE: Render often charges for private workers. If 'free' isn't available for workers,
-    # it might default to the cheapest paid one ($7).
-    rootDir: backend
-    buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: celery -A core worker -l info --concurrency 1 # Reduced concurrency for stability
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: research-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: research-redis
-          property: connectionString
-      - key: LLM_PROVIDER
-        value: gemini
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: GEMINI_MODEL
-        value: gemini-2.0-flash
-
-  # 4. REDIS
+  # 3. REDIS
   - type: redis
     name: research-redis
-    plan: free # $0/mo
+    plan: free 
     ipAllowList: []
 
 databases:
   - name: research-db
-    plan: free # $0/mo (Note: Data deleted after 30 days on Render Free DB)
+    plan: free 
