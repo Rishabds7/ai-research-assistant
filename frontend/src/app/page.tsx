@@ -11,19 +11,18 @@
  */
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { getPapers, uploadPaper, Paper, deleteAllPapers } from "@/lib/api";
 import { PaperItem } from "@/components/PaperItem";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input"; // We'll use standard input for file upload
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, UploadCloud, Trash2, X, AlertTriangle } from "lucide-react";
+import { Loader2, UploadCloud, Trash2 } from "lucide-react";
 import { ReviewTab } from "@/components/ReviewTab";
 
 export default function Home() {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
-  const [rejectedMessages, setRejectedMessages] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchPapers = async () => {
     try {
@@ -38,32 +37,31 @@ export default function Home() {
     fetchPapers();
   }, []);
 
-  const handleReject = (msg: string) => {
-    setRejectedMessages(prev => [...prev, msg]);
-    // Auto-remove notification after 3 seconds
-    setTimeout(() => {
-      setRejectedMessages(prev => prev.slice(1));
-    }, 4000);
-  };
 
   const handleButtonClick = () => {
-    fileInputRef.current?.click();
+    const input = document.getElementById('file-upload-input') as HTMLInputElement;
+    if (input) input.click();
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
 
-      // Duplicate Check
+      // Duplicate Check: Prevents redundant AI processing and DB storage.
       const newFiles = selectedFiles.filter(file =>
         !papers.some(p => p.filename === file.name)
       );
+
+      if (newFiles.length < selectedFiles.length) {
+        console.warn(`${selectedFiles.length - newFiles.length} files skipped (duplicates).`);
+      }
 
       if (newFiles.length === 0) {
         e.target.value = '';
         return;
       }
 
+      // PARALLEL UPLOAD LOGIC
       setUploadingCount(prev => prev + newFiles.length);
 
       await Promise.all(newFiles.map(async (file) => {
@@ -96,61 +94,42 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F8F5EE] py-12 px-4 md:px-8 lg:px-12 relative overflow-hidden">
-      {/* Floating Rejection Notifications */}
-      <div className="fixed top-8 right-8 z-[100] space-y-4 pointer-events-none max-w-sm">
-        {rejectedMessages.map((msg, idx) => (
-          <div key={idx} className="bg-red-600 text-white px-6 py-4 rounded-2xl shadow-2xl border-2 border-red-500/50 flex items-center gap-4 animate-in slide-in-from-right-10 duration-500 pointer-events-auto">
-            <AlertTriangle className="h-6 w-6 text-yellow-300 shrink-0" />
-            <div>
-              <p className="font-bold text-sm">Document Rejected</p>
-              <p className="text-xs opacity-90 leading-tight">{msg}</p>
-            </div>
-            <button
-              onClick={() => setRejectedMessages(prev => prev.filter((_, i) => i !== idx))}
-              className="ml-2 hover:bg-white/20 p-1 rounded-full transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center bg-white/60 backdrop-blur-md p-8 rounded-[32px] border border-white shadow-xl">
+    <main className="min-h-screen bg-background p-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex justify-between items-center bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-[#F1E9D2] shadow-sm">
           <div className="flex items-center gap-6">
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-[#D4AF37] to-[#1A365D] rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+              <div className="absolute -inset-1 bg-linear-to-r from-[#D4AF37] to-[#1A365D] rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
               <img
                 src="/logo.png"
                 alt="PaperDigest AI Logo"
-                className="relative h-20 w-20 object-contain logo-animate rounded-2xl"
+                className="relative h-16 w-16 object-contain logo-animate logo-glow rounded-xl"
               />
             </div>
             <div>
-              <h1 className="text-5xl font-extrabold tracking-tight text-[#1A365D] mb-1">
+              <h1 className="text-4xl font-extrabold tracking-tight text-[#1A365D]">
                 PaperDigest <span className="text-[#D4AF37]">AI</span>
               </h1>
-              <p className="text-slate-500 font-semibold tracking-wide flex items-center gap-2">
-                <span className="w-8 h-[2px] bg-[#D4AF37]"></span>
+              <p className="text-slate-500 font-medium tracking-wide">
                 Synthesizing deep research into actionable insights
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {papers.length > 0 && (
               <Button
                 variant="ghost"
                 onClick={handleDeleteAll}
-                className="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors h-14 w-14 rounded-2xl"
+                className="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                title="Delete all papers"
               >
-                <Trash2 className="h-6 w-6" />
+                <Trash2 className="h-5 w-5" />
               </Button>
             )}
 
             <input
-              ref={fileInputRef}
+              id="file-upload-input"
               type="file"
               accept=".pdf"
               multiple
@@ -160,66 +139,55 @@ export default function Home() {
             <Button
               onClick={handleButtonClick}
               disabled={uploadingCount > 10}
-              className="bg-[#1A365D] hover:bg-[#0F2342] text-white px-8 py-7 rounded-2xl shadow-2xl shadow-blue-900/20 transition-all hover:scale-[1.02] active:scale-[0.98] border-b-4 border-[#081529]"
+              className="bg-[#1A365D] hover:bg-[#2C5282] text-white px-6 py-6 rounded-xl shadow-lg shadow-blue-900/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               {uploadingCount > 0 ? (
                 <>
-                  <Loader2 className="mr-3 h-6 w-6 animate-spin" />
-                  <span className="text-xl font-bold italic">Analyzing {uploadingCount}...</span>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Processing {uploadingCount}...
                 </>
               ) : (
                 <>
-                  <UploadCloud className="mr-3 h-6 w-6" />
-                  <span className="text-xl font-bold">Upload Documents</span>
+                  <UploadCloud className="mr-2 h-5 w-5" />
+                  <span className="text-lg">Upload Documents</span>
                 </>
               )}
             </Button>
           </div>
         </div>
 
-        <Tabs defaultValue="papers" className="w-full mt-12">
-          <TabsList className="flex w-full max-w-md mx-auto bg-[#1A365D]/5 p-2 rounded-2xl mb-12 border border-[#1A365D]/10">
+        <Tabs defaultValue="papers" className="w-full">
+          <TabsList className="flex w-full max-w-md mx-auto bg-[#F1E9D2]/30 p-1 rounded-xl mb-8 border border-[#F1E9D2]/50">
             <TabsTrigger
               value="papers"
-              className="flex-1 py-4 rounded-xl data-[state=active]:bg-[#1A365D] data-[state=active]:text-white shadow-lg transition-all text-sm font-bold uppercase tracking-widest"
+              className="flex-1 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all"
             >
               📄 Documents
             </TabsTrigger>
             <TabsTrigger
               value="review"
-              className="flex-1 py-4 rounded-xl data-[state=active]:bg-[#1A365D] data-[state=active]:text-white shadow-lg transition-all text-sm font-bold uppercase tracking-widest"
+              className="flex-1 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all"
             >
               📋 AI Review
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="papers" className="space-y-8 min-h-[400px]">
-            {papers.length === 0 && uploadingCount === 0 ? (
+          <TabsContent value="papers" className="space-y-6">
+            {papers.length === 0 ? (
               <div
-                className="text-center py-40 bg-white/40 backdrop-blur-sm rounded-[48px] border-4 border-dashed border-[#F1E9D2] group hover:border-[#D4AF37] transition-all cursor-pointer shadow-inner"
+                className="text-center py-32 bg-card-yellow rounded-3xl border-2 border-dashed border-[#F1E9D2] group hover:border-[#D4AF37] transition-colors cursor-pointer"
                 onClick={handleButtonClick}
               >
-                <div className="bg-white p-6 rounded-3xl w-24 h-24 flex items-center justify-center mx-auto mb-8 shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
-                  <UploadCloud className="h-12 w-12 text-[#1A365D]" />
+                <div className="bg-white p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                  <UploadCloud className="h-8 w-8 text-[#1A365D]" />
                 </div>
-                <h3 className="text-3xl font-black text-[#1A365D]">Your Library is Empty</h3>
-                <p className="text-slate-500 mt-4 text-lg font-medium">Upload your research PDFs to begin deep AI synthesis</p>
-                <div className="mt-8 text-[#D4AF37] font-bold flex items-center justify-center gap-2 opacity-50 group-hover:opacity-100">
-                  <span>Click anywhere to start</span>
-                  <Loader2 className="h-4 w-4" />
-                </div>
+                <h3 className="text-xl font-semibold text-[#1A365D]">No documents yet</h3>
+                <p className="text-slate-500 mt-2">Upload your research PDFs to begin AI analysis</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6">
-                {papers.map((paper) => (
-                  <PaperItem
-                    key={paper.id}
-                    paper={paper}
-                    onUpdate={fetchPapers}
-                    onReject={handleReject}
-                  />
-                ))}
-              </div>
+              papers.map((paper) => (
+                <PaperItem key={paper.id} paper={paper} onUpdate={fetchPapers} />
+              ))
             )}
           </TabsContent>
 
