@@ -87,7 +87,16 @@ def process_pdf_task(self, paper_id):
             llm = LLMService()
             # Send just the first 10k chars for metadata (fast)
             info = llm.extract_paper_info(paper.full_text[:10000])
-            paper.title = sanitize_text(info.get('title', 'Unknown'))
+            title = sanitize_text(info.get('title', 'Unknown'))
+            
+            # REJECTION LOGIC
+            if title.startswith("NON-RESEARCH"):
+                logger.warning(f"Rejecting non-research document: {paper.filename}")
+                paper.file.delete() # Delete the PDF file from storage
+                paper.delete()      # Delete the DB record
+                raise ValueError("This does not appear to be a valid research paper. Please upload an academic PDF.")
+
+            paper.title = title
             
             authors_data = info.get('authors', 'Unknown')
             if isinstance(authors_data, list):
@@ -97,6 +106,9 @@ def process_pdf_task(self, paper_id):
                 paper.authors = sanitize_text(authors_data)
             paper.save(update_fields=['title', 'authors'])
             logger.info(f"Metadata identified: {paper.title}")
+        except ValueError as ve:
+            # Re-raise validation errors to be caught nicely
+            raise ve
         except Exception as e:
             logger.error(f"Metadata error: {e}")
             

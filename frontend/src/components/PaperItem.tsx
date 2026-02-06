@@ -127,12 +127,25 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                             <FileText className="h-6 w-6 text-[#1A365D]" />
                         </div>
                         <div>
-                            <CardTitle className="text-xl font-bold text-[#1A365D] tracking-tight">{paper.filename}</CardTitle>
-                            {!paper.processed && (
+                            {paper.processed === false && paper.uploadTaskId === 'failed' && paper.title?.startsWith("NON-RESEARCH") ? (
+                                <div className="text-red-600 font-bold flex items-center gap-2">
+                                    <span>⚠️ Rejected: Non-Academic Content</span>
+                                </div>
+                            ) : (
+                                <CardTitle className="text-xl font-bold text-[#1A365D] tracking-tight">{paper.filename}</CardTitle>
+                            )}
+
+                            {!paper.processed && !paper.uploadTaskId?.includes('failed') && (
                                 <div className="flex items-center gap-2 mt-1 text-[10px] text-blue-500 font-bold uppercase tracking-widest animate-pulse">
                                     <Loader2 className="h-3 w-3 animate-spin" />
                                     Deep Analysis in Progress...
                                 </div>
+                            )}
+
+                            {paper.title?.startsWith("NON-RESEARCH") && (
+                                <p className="text-xs text-red-500 mt-1 font-medium">
+                                    Please upload a valid academic/technical research PDF.
+                                </p>
                             )}
                         </div>
                     </div>
