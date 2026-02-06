@@ -1,6 +1,6 @@
 "use client";
 
-import { Paper, updatePaper } from "../lib/api";
+import { Paper, updatePaper } from "@/lib/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Button } from "./ui/button";
 import { Download, FileEdit, X } from "lucide-react";

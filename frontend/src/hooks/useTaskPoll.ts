@@ -8,7 +8,7 @@
  * is 'completed' or 'failed'.
  */
 import { useState, useEffect } from 'react';
-import { getTaskStatus } from '../lib/api';
+import { getTaskStatus } from '@/lib/api';
 
 export function useTaskPoll(taskId: string | null, onComplete?: (result: any) => void) {
     const [status, setStatus] = useState<string>('idle');

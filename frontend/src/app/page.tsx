@@ -12,13 +12,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getPapers, uploadPaper, Paper, deleteAllPapers } from "../lib/api";
-import { PaperItem } from "../components/PaperItem";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input"; // We'll use standard input for file upload
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { getPapers, uploadPaper, Paper, deleteAllPapers } from "@/lib/api";
+import { PaperItem } from "@/components/PaperItem";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input"; // We'll use standard input for file upload
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, UploadCloud, Trash2 } from "lucide-react";
-import { ReviewTab } from "../components/ReviewTab";
+import { ReviewTab } from "@/components/ReviewTab";
 
 export default function Home() {
   const [papers, setPapers] = useState<Paper[]>([]);
