@@ -10,7 +10,7 @@ from rest_framework.routers import DefaultRouter
 from .views import PaperViewSet, TaskStatusView, PingView
 
 router = DefaultRouter()
-router.register(r'papers', PaperViewSet)
+router.register(r'papers', PaperViewSet, basename='paper')
 
 urlpatterns = [
     path('', include(router.urls)),
