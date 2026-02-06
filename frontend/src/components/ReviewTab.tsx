@@ -116,7 +116,7 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
             </div>
 
             {reviewedPapers.length === 0 ? (
-                <div className="text-center py-20 bg-[var(--card-yellow)] rounded-2xl border border-dashed border-[#F1E9D2]">
+                <div className="text-center py-20 bg-card-yellow rounded-2xl border border-dashed border-[#F1E9D2]">
                     <p className="text-slate-500">
                         No papers reviewed yet. Extract a summary in the Documents tab to see it here.
                     </p>
@@ -135,7 +135,7 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                             {reviewedPapers.map((paper) => (
                                 <TableRow key={paper.id} className="border-[#F1E9D2]/50 hover:bg-[#FDFBF7]/50 transition-colors">
                                     <TableCell className="align-top py-6">
-                                        <div className="font-bold text-[#1A365D] mb-1 leading-tight break-words">
+                                        <div className="font-bold text-[#1A365D] mb-1 leading-tight wrap-break-word">
                                             {paper.filename}
                                         </div>
                                         {paper.title && (
@@ -157,8 +157,8 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                                                 }).map((point, i) => (
                                                     <li key={i} className="flex gap-3 leading-relaxed">
                                                         <span className="text-[#D4AF37] font-bold shrink-0">◇</span>
-                                                        {/* Clean again for display */}
-                                                        <span>{point.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim()}</span>
+                                                        {/* Clean and normalize whitespace for display */}
+                                                        <span>{point.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim().replace(/\s+/g, ' ')}</span>
                                                     </li>
                                                 ))}
                                             </ul>

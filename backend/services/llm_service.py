@@ -126,14 +126,13 @@ def _parse_json_safe(raw: str, default: Any = None) -> Any:
 def clean_llm_summary(text: str) -> str:
     """
     Aggressively removes intro/outro meta-text from the LLM. 
-    Also normalizes content by removing leading bullets, numbers, and symbols.
-    The frontend will handle its own styling (e.g. ◇).
+    Also normalizes content by merging wrapped lines and removing leading bullets.
     """
     if not text:
         return ""
         
     lines = text.split('\n')
-    cleaned_lines = []
+    processed_points = []
     
     # Phrases usually added by LLMs that aren't part of the content
     meta_patterns = [
@@ -155,7 +154,9 @@ def clean_llm_summary(text: str) -> str:
         r"^i have extracted",
         r"^certainly",
         r"^(here|below) is the list",
-        r"^(the|following) bullet points? outline"
+        r"^(the|following) bullet points? outline",
+        r"^in summary",
+        r"^overall,"
     ]
     
     for line in lines:
@@ -165,10 +166,9 @@ def clean_llm_summary(text: str) -> str:
         if not cleaned_line:
             continue
             
-        # Remove standard meta-note suffixes (e.g., "Note: this is from page 4")
+        # Remove standard meta-note suffixes
         if "Note:" in cleaned_line:
             parts = cleaned_line.split("Note:", 1)
-            # If the part before "Note:" is meaningful, keep it, otherwise skip the line
             if parts[0].strip() and len(parts[0].strip()) > 10:
                 cleaned_line = parts[0].strip()
             else:
@@ -177,22 +177,41 @@ def clean_llm_summary(text: str) -> str:
         # Check if line is meta-text
         is_meta = False
         stripped_lower = cleaned_line.lower()
-        
         for pattern in meta_patterns:
             if re.search(pattern, stripped_lower):
                 is_meta = True
                 break
         
-        # Only keep lines that aren't meta-text and contain actual content
-        if not is_meta and len(cleaned_line) > 5:
-            # STRIP LEADING BULLETS/NUMBERS (-, •, *, 1., etc.)
-            # The system will add its own beautiful bullet symbols in the UI.
-            # This ensures we don't get double bullets like "◇ - Point"
-            content = re.sub(r"^[ \t]*([•\-*–—\d\.]+[ \t]*)+", "", cleaned_line).strip()
-            if content and len(content) > 3:
-                cleaned_lines.append(content)
+        if is_meta or len(cleaned_line) < 3:
+            continue
+
+        # STRIP LEADING BULLETS/NUMBERS
+        content = re.sub(r"^[ \t]*([•\-*–—\d\.]+[ \t]*)+", "", cleaned_line).strip()
+        if not content:
+            continue
+
+        # CONTINUATION LOGIC:
+        # If this line starts with a lowercase letter, or the previous point didn't end with punctuation,
+        # it's likely a wrapped line from the same bullet point.
+        if processed_points:
+            last_point = processed_points[-1]
+            last_char_punctuation = re.search(r'[\.\?\!]$', last_point.strip())
             
-    return '\n'.join(cleaned_lines)
+            # Heuristic: starts with lowercase, bracket, or doesn't follow a period
+            is_continuation = (
+                content[0].islower() or 
+                content[0] in [',', ')', ']', '}'] or
+                not last_char_punctuation or
+                last_point.lower().split()[-1] in ['the', 'and', 'of', 'with', 'for', 'to', 'in', 'on', 'by', 'at', 'is', 'are']
+            )
+            
+            if is_continuation:
+                processed_points[-1] = f"{last_point} {content}"
+                continue
+
+        processed_points.append(content)
+            
+    return '\n'.join(processed_points)
 
 
 def _extract_license_snippets(text: str) -> list[str]:
@@ -470,10 +489,11 @@ Return ONLY JSON."""
 REQUIREMENTS:
 1. Provide a comprehensive summary using 6-8 high-density bullet points.
 2. Cover all key findings, experimental results, and specific methodologies.
-3. Each point MUST be descriptive and factual.
-4. DO NOT include any introductory or meta text (like "Here is the summary").
-5. DO NOT start points with symbols like - or •; the system will add them.
-6. Provide ONLY the points, one per line.
+3. Each point MUST be descriptive, factual, and complete.
+4. Each bullet point MUST be a single continuous line. DO NOT use hard line breaks or wrap text within a single bullet point.
+5. DO NOT include any introductory or meta text.
+6. DO NOT start points with symbols like - or •; provide only raw text.
+7. Provide ONLY the points, one per line.
 
 Section Content:
 {content[:15000]}"""
@@ -501,8 +521,8 @@ Section Content:
 
 REQUIREMENTS:
 1. Provide 5-8 powerful, high-impact bullet points.
-2. Synthesize the core contribution, the novel methodology, the key results, and the broader impact.
-3. DO NOT include any introductory text.
+2. Each bullet point MUST be a single continuous line. DO NOT use hard line breaks or wrap text.
+3. DO NOT include any introductory or meta text.
 4. Provide ONLY the points, one per line. No symbols or leading numbers.
 
 Summaries:
@@ -655,10 +675,13 @@ Snippets:
             if section_name == 'References':
                 continue
                 
-            prompt = f"""Summarize this {section_name} section with 6-8 bullet points.
-Cover key findings, methods, and results.
-DO NOT include intro text or bullets symbols (- or •).
-Provide ONLY the points, one per line.
+            prompt = f"""Summarize this {section_name} section from a research paper.
+
+REQUIREMENTS:
+1. Provide 6-8 descriptive bullet points.
+2. Each bullet point MUST be a single continuous line. DO NOT use hard line breaks.
+3. DO NOT include introductory text or bullet symbols (- or •).
+4. Provide ONLY the points, one per line.
 
 Section Content:
 {content[:8000]}"""
@@ -675,8 +698,11 @@ Section Content:
     def generate_global_summary(self, section_summaries: dict[str, str]) -> str:
         combined = "\n".join([f"{n}:\n{t}" for n, t in section_summaries.items()])
         prompt = f"""Synthesize these summaries into a global overview of the paper with 6-8 high-impact points.
-DO NOT include intro text or bullet symbols.
-Provide ONLY the points, one per line.
+
+REQUIREMENTS:
+1. Each bullet point MUST be a single continuous line. DO NOT use hard line breaks.
+2. DO NOT include introductory text or bullet symbols.
+3. Provide ONLY the points, one per line.
 
 Summaries:
 {combined}"""

@@ -408,7 +408,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                                                 return (
                                                                     <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed">
                                                                         <span className="text-[#D4AF37] shrink-0 font-bold mt-0.5">◇</span>
-                                                                        <span>{cleanPoint}</span>
+                                                                        <span>{cleanPoint.replace(/\s+/g, ' ')}</span>
                                                                     </li>
                                                                 );
                                                             })}
