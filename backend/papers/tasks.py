@@ -62,55 +62,56 @@ def update_task_status(task_id, status, result=None, error=None):
 def process_pdf_task(self, paper_id):
     """
     INITIAL INGESTION PIPELINE (Stage 1).
-    
-    This is the first task triggered after a file upload.
-    It performs 3 specific AI-adjacent steps:
-    1. STRUCTURAL EXTRACTION: Turns raw PDF into a dict of logical sections.
-    2. METADATA IDENTIFICATION: Uses the first 15k chars (Title/Authors)—enough 
-       info to identify the paper without wasting tokens on the full body.
-    3. VECTOR STORAGE: Chunks and embeds the text so the paper becomes searchable.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
     
     try:
+        logger.info(f"Starting PDF processing for Paper {paper_id}")
         paper = Paper.objects.get(id=paper_id)
         
         # 1. Process PDF using our custom segmentation logic
+        logger.info(f"Extracting text from {paper.filename}...")
         processor = PDFProcessor()
         data = processor.process_pdf(paper.file.path, str(paper.id))
         
         paper.full_text = sanitize_text(data['full_text'])
         paper.sections = sanitize_text(data['sections'])
         paper.processed = True
-        
-        # 2. Metadata Extraction (Multi-pass logic)
+        paper.save(update_fields=['full_text', 'sections', 'processed'])
+        logger.info("Text extraction successful.")
+
+        # 2. Metadata Extraction
         try:
+            logger.info("Calling Gemini for metadata extraction...")
             llm = LLMService()
-            info = llm.extract_paper_info(paper.full_text[:15000])
+            # Send just the first 10k chars for metadata (fast)
+            info = llm.extract_paper_info(paper.full_text[:10000])
             paper.title = sanitize_text(info.get('title', 'Unknown'))
             
-            # Store authors as JSON string if it's a list, otherwise store as-is
             authors_data = info.get('authors', 'Unknown')
             if isinstance(authors_data, list):
                 import json
                 paper.authors = json.dumps(authors_data)
             else:
                 paper.authors = sanitize_text(authors_data)
+            paper.save(update_fields=['title', 'authors'])
+            logger.info(f"Metadata identified: {paper.title}")
         except Exception as e:
             logger.error(f"Metadata error: {e}")
             
-        paper.save()
-        
         # 3. Generate Visual Semantic Space (Embeddings)
+        logger.info("Starting batch embedding generation (Google Cloud)...")
         embed_service = EmbeddingService()
         embed_service.store_embeddings(paper, paper.sections)
+        logger.info("Embedding generation successful.")
         
         update_task_status(task_id, 'completed', result={"paper_id": str(paper.id)})
+        logger.info(f"Task {task_id} completed successfully.")
         return {"status": "success", "paper_id": str(paper.id)}
         
     except Exception as e:
-        logger.error(f"Error processing PDF {paper_id}: {e}")
+        logger.error(f"FATAL Task Error {task_id}: {e}")
         update_task_status(task_id, 'failed', error=str(e))
         raise
 

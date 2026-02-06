@@ -51,54 +51,70 @@ class EmbeddingService:
             logger.error(f"Google Embedding Error: {e}")
             return []
 
-    def store_embeddings(self, paper_instance, sections: Dict[str, str], chunk_size: int = 1000):
+    def store_embeddings(self, paper_instance, sections: Dict[str, str], chunk_size: int = 1500):
         """
         Splits paper into chunks and stores their Google embeddings in PostgreSQL.
+        Uses batching to stay fast and avoid rate limits.
         """
         # Clear existing
         EmbeddingModel.objects.filter(paper=paper_instance).delete()
         
-        embeddings_to_create = []
-
+        all_chunks = []
         for section_name, text in sections.items():
             if not text.strip(): continue
             
-            # Simple paragraph-based chunking
+            # Simple paragraph-based splitting
             paragraphs = text.split('\n\n')
-            
             for para in paragraphs:
                 para = para.strip()
-                if not para or len(para) < 20:
-                    continue
-                    
-                # If paragraph is too big, split it
-                if len(para) > chunk_size * 1.5:
-                    chunks = [para[i:i+chunk_size] for i in range(0, len(para), chunk_size)]
-                    for chunk in chunks:
-                        vec = self.generate_embedding(chunk)
-                        if vec:
-                            embeddings_to_create.append(
-                                EmbeddingModel(
-                                    paper=paper_instance,
-                                    section_name=section_name,
-                                    text=chunk,
-                                    embedding=vec
-                                )
-                            )
+                if not para or len(para) < 20: continue
+                
+                # Split huge paragraphs
+                if len(para) > chunk_size:
+                    sub_chunks = [para[i:i+chunk_size] for i in range(0, len(para), chunk_size)]
+                    for sc in sub_chunks:
+                        all_chunks.append({"section": section_name, "text": sc})
                 else:
-                    vec = self.generate_embedding(para)
-                    if vec:
-                        embeddings_to_create.append(
-                            EmbeddingModel(
-                                paper=paper_instance,
-                                section_name=section_name,
-                                text=para,
-                                embedding=vec
-                            )
-                        )
+                    all_chunks.append({"section": section_name, "text": para})
+
+        if not all_chunks:
+            return
+
+        logger.info(f"Generating embeddings for {len(all_chunks)} chunks in batches...")
         
+        embeddings_to_create = []
+        # Google API supports batching multiple contents in one call
+        BATCH_SIZE = 50 
+        
+        for i in range(0, len(all_chunks), BATCH_SIZE):
+            batch = all_chunks[i:i+BATCH_SIZE]
+            batch_texts = [item["text"] for item in batch]
+            
+            try:
+                # Use batch_embed_contents for massive speedup
+                result = genai.embed_content(
+                    model=self.model_name,
+                    content=batch_texts,
+                    task_type="retrieval_document"
+                )
+                
+                for idx, vec in enumerate(result['embedding']):
+                    embeddings_to_create.append(
+                        EmbeddingModel(
+                            paper=paper_instance,
+                            section_name=batch[idx]["section"],
+                            text=batch[idx]["text"],
+                            embedding=vec
+                        )
+                    )
+            except Exception as e:
+                logger.error(f"Batch Embedding Error at index {i}: {e}")
+                # Fallback: try individual if batch fails (rare)
+                continue
+
         if embeddings_to_create:
-            EmbeddingModel.objects.bulk_create(embeddings_to_create, batch_size=50)
+            EmbeddingModel.objects.bulk_create(embeddings_to_create, batch_size=100)
+            logger.info(f"Successfully stored {len(embeddings_to_create)} embeddings.")
 
     def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
         """

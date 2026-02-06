@@ -21,7 +21,8 @@ services:
     # BUILD: Install and collect static (no DB access needed)
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
     # START: Migrate (needs DB) then run services
-    startCommand: python manage.py migrate && celery -A core worker -l info --concurrency 1 & gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
+    # We increase gunicorn timeout to 120s to prevent worker timeouts during heavy processing
+    startCommand: python manage.py migrate && (celery -A core worker -l info --concurrency 1 & gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --timeout 120 --workers 2)
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
