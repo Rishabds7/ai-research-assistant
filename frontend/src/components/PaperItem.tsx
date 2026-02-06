@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Paper, extractAllSections, deletePaper, extractMetadata } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { useTaskPoll } from '@/hooks/useTaskPoll';
+import { Paper, extractAllSections, deletePaper, extractMetadata } from '../lib/api';
+import { Button } from './ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { useTaskPoll } from '../hooks/useTaskPoll';
 import { Loader2, FileText, CheckCircle2, Trash2, ChevronDown, ChevronRight, Database, Award, List, Eye, X } from 'lucide-react';
 
 interface PaperItemProps {
