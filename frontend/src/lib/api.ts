@@ -15,6 +15,26 @@ export const api = axios.create({
     baseURL: API_URL,
 });
 
+// Helper to get or create a persistent session ID
+const getSessionId = () => {
+    if (typeof window === 'undefined') return '';
+    let sessionId = localStorage.getItem('research_session_id');
+    if (!sessionId) {
+        sessionId = crypto.randomUUID();
+        localStorage.setItem('research_session_id', sessionId);
+    }
+    return sessionId;
+};
+
+// Add interceptor to inject Session ID into every request
+api.interceptors.request.use((config) => {
+    const sessionId = getSessionId();
+    if (sessionId) {
+        config.headers['X-Session-ID'] = sessionId;
+    }
+    return config;
+});
+
 export interface Paper {
     id: string;
     filename: string;

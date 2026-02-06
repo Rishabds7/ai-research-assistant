@@ -32,8 +32,23 @@ class PaperViewSet(viewsets.ModelViewSet):
     The main API for Paper management.
     Includes Standard CRUD (Create, Read, Update, Delete) + Custom AI Actions.
     """
-    queryset = Paper.objects.all()
-    
+    def get_queryset(self):
+        """
+        Filters papers based on the 'X-Session-ID' header.
+        This provides basic privacy/isolation for public demo users without full auth.
+        """
+        queryset = Paper.objects.all()
+        session_id = self.request.headers.get('X-Session-ID')
+        
+        if session_id:
+            queryset = queryset.filter(session_id=session_id)
+        else:
+            # Fallback: If no session ID, valid behavior is debatable. 
+            # For this demo, let's return nothing to encourage frontend to send the ID.
+            queryset = queryset.none()
+            
+        return queryset.order_by('-uploaded_at')
+
     def get_serializer_class(self):
         if self.action == 'list':
             return PaperListSerializer
@@ -49,14 +64,16 @@ class PaperViewSet(viewsets.ModelViewSet):
             return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
             
         uploaded_file = request.FILES['file']
+        session_id = request.headers.get('X-Session-ID')
         
-        # 1. Filename check
-        if Paper.objects.filter(filename=uploaded_file.name).exists():
-            return Response({'error': 'A paper with this filename already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+        # 1. Filename check (scoped to session)
+        if session_id and Paper.objects.filter(filename=uploaded_file.name, session_id=session_id).exists():
+             return Response({'error': 'You have already uploaded this paper.'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        paper = serializer.save(filename=uploaded_file.name)
+        # Save with session_id
+        paper = serializer.save(filename=uploaded_file.name, session_id=session_id)
         
         # Trigger processing task
         task = process_pdf_task.delay(str(paper.id))
