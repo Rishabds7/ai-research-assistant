@@ -435,10 +435,10 @@ Return ONLY JSON."""
                     
         return licenses
 
-    def summarize_sections(self, sections: dict[str, str]) -> dict[str, str]:
+    def summarize_sections(self, sections: dict[str, str], full_text: str = "") -> dict[str, str]:
         """
         Maps paper sections to standardized academic sections and creates summaries.
-        Returns summaries in a fixed order with bullet points.
+        Uses full_text as a fallback if specific sections like Abstract are missing.
         """
         # Standardized section mapping
         STANDARD_SECTIONS = [
@@ -448,20 +448,18 @@ Return ONLY JSON."""
             'Methodology',
             'Experiments',
             'Results',
-            'Conclusion',
-            'References'
+            'Conclusion'
         ]
         
         # Section mapping keywords
         SECTION_MAPPING = {
-            'Abstract': ['abstract', 'summary'],
+            'Abstract': ['abstract', 'abstract.'],
             'Introduction': ['introduction', 'intro', 'motivation'],
             'Background': ['background', 'related work', 'literature review', 'prior work'],
             'Methodology': ['methodology', 'method', 'approach', 'model', 'architecture', 'framework', 'technique', 'algorithm'],
             'Experiments': ['experiment', 'evaluation', 'setup', 'implementation', 'analysis'],
             'Results': ['result', 'finding', 'performance', 'discussion', 'observation'],
-            'Conclusion': ['conclusion', 'future work', 'limitation', 'summary'],
-            'References': ['reference', 'bibliography', 'citation']
+            'Conclusion': ['conclusion', 'concluding', 'future work', 'limitation']
         }
         
         # Map paper sections to standard sections
@@ -477,26 +475,33 @@ Return ONLY JSON."""
             
             if mapped_content:
                 mapped_sections[standard_section] = '\n\n'.join(mapped_content)
+
+        # SMART FALLBACK: If Abstract is missing, assume it's the first 10k chars (common for non-standard PDFs)
+        if (not mapped_sections.get('Abstract') or len(mapped_sections['Abstract']) < 100) and full_text:
+            mapped_sections['Abstract'] = full_text[:8000]
+
+        # SMART FALLBACK: If Conclusion is missing, take the last 8k chars
+        if (not mapped_sections.get('Conclusion') or len(mapped_sections['Conclusion']) < 100) and full_text:
+            mapped_sections['Conclusion'] = full_text[-8000:]
         
         # Generate summaries for each standard section
         summaries = {}
         for section_name, content in mapped_sections.items():
-            if section_name == 'References':
-                continue  # Skip references section
+            if not content or len(content.strip()) < 50:
+                continue
                 
-            prompt = f"""Summarize this {section_name} section from a research paper.
+            prompt = f"""You are analyzing a research paper. Please provide a high-density executive summary of the "{section_name}" section.
 
-REQUIREMENTS:
-1. Provide a comprehensive summary using 6-8 high-density bullet points.
-2. Cover all key findings, experimental results, and specific methodologies.
-3. Each point MUST be descriptive, factual, and complete.
-4. Each bullet point MUST be a single continuous line. DO NOT use hard line breaks or wrap text within a single bullet point.
-5. DO NOT include any introductory or meta text.
-6. DO NOT start points with symbols like - or •; provide only raw text.
-7. Provide ONLY the points, one per line.
+CONSTRAINTS:
+1. Provide 6-8 comprehensive bullet points.
+2. Each point must be a single, long-form continuous line (no internal line breaks or wrapping).
+3. Focus on specific technical details, findings, or claims.
+4. DO NOT use symbols like - or * or • to start the lines.
+5. Provide ONLY the points, one per line. No intro/outro text.
 
-Section Content:
+Content:
 {content[:15000]}"""
+            
             raw_summary = self._generate(prompt)
             summaries[section_name] = clean_llm_summary(raw_summary)
         

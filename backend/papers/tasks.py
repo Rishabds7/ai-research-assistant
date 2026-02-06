@@ -181,7 +181,7 @@ def extract_all_sections_task(self, paper_id):
         llm = LLMService()
         
         # Intelligent summarization based on paper structure
-        summaries = llm.summarize_sections(paper.sections)
+        summaries = llm.summarize_sections(paper.sections, paper.full_text)
         
         # Persistence: save individual section summaries for the side-by-side view
         SectionSummary.objects.filter(paper=paper).delete()

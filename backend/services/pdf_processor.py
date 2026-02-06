@@ -28,6 +28,7 @@ class PDFProcessor:
         "introduction",
         "background",
         "related work",
+        "related works",
         "literature review",
         "preliminaries",
         "problem statement",
@@ -42,6 +43,7 @@ class PDFProcessor:
         "system design",
         "implementation",
         "experiments",
+        "experimental results",
         "experimental setup",
         "experimental setups",
         "experimental design",
@@ -54,9 +56,12 @@ class PDFProcessor:
         "discussion",
         "conclusion",
         "conclusions",
+        "concluding remarks",
+        "concluding",
         "future work",
         "summary",
         "acknowledgments",
+        "acknowledgements",
         "references"
     ]
 
