@@ -18,9 +18,10 @@ services:
     env: python
     plan: free
     rootDir: backend
-    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
-    # Runs both Celery (in background) and Gunicorn (in foreground)
-    startCommand: celery -A core worker -l info --concurrency 1 & gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
+    # BUILD: Install and collect static (no DB access needed)
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    # START: Migrate (needs DB) then run services
+    startCommand: python manage.py migrate && celery -A core worker -l info --concurrency 1 & gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
