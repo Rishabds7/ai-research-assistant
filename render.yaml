@@ -8,7 +8,7 @@ services:
     startCommand: npm start
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        sync: false # You will need to paste the backend URL here after the backend is created
+        sync: false # Paste the backend URL here after deployment (e.g. https://research-assistant-backend.onrender.com/api)
 
   # 2. BACKEND (Django API)
   - type: web
@@ -42,7 +42,7 @@ services:
       - key: GEMINI_MODEL
         value: gemini-2.0-flash
 
-  # 3. CELERY WORKER (Processing)
+  # 3. CELERY WORKER
   - type: worker
     name: research-worker
     env: python
@@ -66,12 +66,14 @@ services:
       - key: GEMINI_MODEL
         value: gemini-2.0-flash
 
+  # 4. REDIS (Moved from databases to services)
+  - type: redis
+    name: research-redis
+    plan: free # Managed Redis Free tier
+    ipAllowList: [] # Required to allow access from other services
+
 databases:
   - name: research-db
     databaseName: research_db
     user: research_user
-    plan: starter 
-
-  - name: research-redis
-    plan: starter
-    ipAllowList: [] # Standard for Render Redis
+    plan: basic # 'starter' is now legacy. 'basic' is the modern standard entry tier.
