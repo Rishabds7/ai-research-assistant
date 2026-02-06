@@ -302,6 +302,8 @@ class GeminiLLMService:
     Leverages huge context windows (1M+ tokens) and high-level reasoning.
     """
     def __init__(self) -> None:
+        if not GEMINI_API_KEY:
+            logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=GEMINI_API_KEY)
         self.model = genai.GenerativeModel(GEMINI_MODEL)
 

@@ -28,6 +28,8 @@ class EmbeddingService:
     """
     def __init__(self):
         # Configure the API key from settings
+        if not settings.GEMINI_API_KEY:
+            logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self.model_name = "models/text-embedding-004"
 
