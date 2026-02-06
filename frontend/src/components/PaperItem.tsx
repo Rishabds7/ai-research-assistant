@@ -49,6 +49,26 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         setProcessTaskId(null);
     });
 
+    // AUTO-CLEANUP FOR REJECTIONS
+    useEffect(() => {
+        if (processStatus === 'failed' && processError?.includes('REJECTED')) {
+            // Show alert (in a real app, use a Toast)
+            const reason = processError.replace('REJECTED: ', '').replace('REJECTED:', '').trim();
+            alert(`⚠️ DOCUMENT REJECTED\n\n${reason}\n\nPlease upload a valid research paper.`);
+
+            // Wait 1 second then auto-delete to keep the list clean
+            const timer = setTimeout(async () => {
+                try {
+                    await deletePaper(paper.id);
+                    onUpdate();
+                } catch (e) {
+                    console.error("Auto-delete failed", e);
+                }
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [processStatus, processError, paper.id, onUpdate]);
+
     // Poll for summarize
     const { status: sumStatus } = useTaskPoll(summarizeTaskId, () => {
         onUpdate();
@@ -109,6 +129,11 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const isSumLoading = !!summarizeTaskId && (sumStatus === 'idle' || sumStatus === 'pending' || sumStatus === 'running');
     const isDsLoading = !!datasetsTaskId && (dsStatus === 'idle' || dsStatus === 'pending' || dsStatus === 'running');
     const isLicLoading = !!licensesTaskId && (licStatus === 'idle' || licStatus === 'pending' || licStatus === 'running');
+
+    // Don't show the card at all if it's rejected (it will be deleted by the useEffect)
+    if (processStatus === 'failed' && processError?.includes('REJECTED')) {
+        return null;
+    }
 
     return (
         <Card className={`mb-6 border-[#F1E9D2] shadow-sm hover:shadow-md transition-all rounded-2xl overflow-hidden ${processStatus === 'failed' ? 'bg-red-50/30 border-red-200' : 'bg-white'}`}>
