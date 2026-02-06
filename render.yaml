@@ -3,17 +3,19 @@ services:
   - type: web
     name: research-assistant-frontend
     env: node
+    plan: free # $0/mo
     rootDir: frontend
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        sync: false # Paste the backend URL here after deployment (e.g. https://research-assistant-backend.onrender.com/api)
+        sync: false 
 
-  # 2. BACKEND (Django API)
+  # 2. BACKEND (Django API) - Now lightweight enough for Free tier!
   - type: web
     name: research-assistant-backend
     env: python
+    plan: free # $0/mo
     rootDir: backend
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
     startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
@@ -46,9 +48,12 @@ services:
   - type: worker
     name: research-worker
     env: python
+    plan: free # $12/mo on standard but some users have free worker options. 
+    # NOTE: Render often charges for private workers. If 'free' isn't available for workers,
+    # it might default to the cheapest paid one ($7).
     rootDir: backend
     buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: celery -A core worker -l info --concurrency 2
+    startCommand: celery -A core worker -l info --concurrency 1 # Reduced concurrency for stability
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -69,10 +74,9 @@ services:
   # 4. REDIS
   - type: redis
     name: research-redis
-    plan: free 
+    plan: free # $0/mo
     ipAllowList: []
 
 databases:
   - name: research-db
-    plan: Basic-1gb # Switched to verified flexible plan name
-    diskSizeGB: 1 # Required for flexible plans
+    plan: free # $0/mo (Note: Data deleted after 30 days on Render Free DB)
