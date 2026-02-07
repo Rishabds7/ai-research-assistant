@@ -206,9 +206,21 @@ def extract_all_sections_task(self, paper_id):
         ])
 
         # Global Synthesis: provide the TL;DR for the dashboard
+        logger.info(f"Generating global summary for paper {paper.id} from {len(summaries)} sections")
         global_sum = llm.generate_global_summary(summaries)
+        
+        if not global_sum and summaries:
+            logger.warning(f"Global summary for {paper.id} returned empty. Using first 5 section points as fallback.")
+            # Fallback: Take the first point of each section summary
+            fallback_points = []
+            for s_name, s_text in list(summaries.items())[:5]:
+                first_line = s_text.split('\n')[0].strip()
+                if first_line:
+                    fallback_points.append(f"{s_name}: {first_line}")
+            global_sum = "\n".join(fallback_points)
+            
         paper.global_summary = sanitize_text(global_sum)
-        paper.save(update_fields=['global_summary', 'task_ids'])
+        paper.save(update_fields=['global_summary'])
         
         update_task_status(task_id, 'completed', result=summaries)
         return summaries
