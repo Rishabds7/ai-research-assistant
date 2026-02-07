@@ -370,18 +370,18 @@ class GeminiLLMService:
         Uses first 10,000 characters to extract Title and Authors.
         Academic titles are usually prominent in the first few lines of raw text.
         """
-        prompt = f"""Extract the title and authors from this research paper.
+        prompt = """Extract the title and authors from this research paper.
 
 Return ONLY a JSON object with this exact structure:
-{{
+{
     "title": "Full paper title",
     "authors": ["Author One", "Author Two", "Author Three"]
-}}
+}
 
 If you cannot find the information, use "Unknown".
 
 Text:
-{context[:10000]}"""
+""" + context[:12000]
         raw = self._generate(prompt)
         return _parse_json_safe(raw, {"title": "Unknown", "authors": ["Unknown"]})
 
@@ -393,7 +393,7 @@ Text:
         snippets = _extract_dataset_snippets(context)
         snippets_text = "\n---\n".join(snippets)
         # LLM Call for identification
-        prompt = f"""Extract ALL specific data sources and datasets mentioned in these snippets from a research paper.
+        prompt = """Extract ALL specific data sources and datasets mentioned in these snippets from a research paper.
 
 Look for:
 - Standard Benchmarks (ImageNet, SQuAD, etc.)
@@ -408,7 +408,7 @@ Rules:
 5. Deduplicate and normalize names.
 
 Snippets:
-{snippets_text}"""
+""" + snippets_text
         raw = self._generate(prompt)
         result = _parse_json_safe(raw, ["None mentioned"])
         return result if result else ["None mentioned"]
@@ -423,7 +423,7 @@ Snippets:
         # This covers 99% of research papers entirely.
         full_context = paper_text[:200000]
         
-        prompt = f"""You are a professional research librarian and license compliance auditor. 
+        prompt = """You are a professional research librarian and license compliance auditor. 
 Your goal is to identify ALL licenses and usage terms mentioned in the research paper below. 
 
 Scope of Search:
@@ -440,7 +440,7 @@ Rules:
 
 Paper Text:
 ---
-{full_context}
+""" + full_context + """
 ---
 
 Return ONLY a JSON list of strings."""
