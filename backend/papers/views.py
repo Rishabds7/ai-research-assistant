@@ -239,34 +239,40 @@ class PaperViewSet(viewsets.ModelViewSet):
              return Response({'error': 'Paper already exists in your library.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # 3. Download PDF
-            response = requests.get(pdf_url, stream=True, timeout=30)
+            # 3. Download PDF (ArXiv requires User-Agent)
+            headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+            response = requests.get(pdf_url, stream=True, timeout=30, headers=headers)
+            
             if response.status_code != 200:
-                # ArXiv might block if user-agent is missing, try with common one
-                headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-                response = requests.get(pdf_url, stream=True, timeout=30, headers=headers)
-                if response.status_code != 200:
-                    return Response({'error': f'ArXiv returned status {response.status_code}'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': f'ArXiv returned status {response.status_code}'}, status=status.HTTP_400_BAD_REQUEST)
 
             # 4. Save to DB
             paper = Paper(filename=filename, session_id=session_id)
             paper.file.save(filename, ContentFile(response.content), save=True)
             
-            # 5. Trigger Task
-            task = process_pdf_task.delay(str(paper.id))
-            TaskStatus.objects.create(
-                task_id=task.id,
-                task_type='process_pdf',
-                status='pending'
-            )
+            # 5. Trigger Task (Resiliently)
+            from django.db import transaction
+            
+            def trigger_task():
+                task = process_pdf_task.delay(str(paper.id))
+                TaskStatus.objects.create(
+                    task_id=task.id,
+                    task_type='process_pdf',
+                    status='pending'
+                )
+            
+            if transaction.get_connection().in_atomic_block:
+                transaction.on_commit(trigger_task)
+            else:
+                trigger_task()
 
             return Response({
                 'paper': PaperDetailSerializer(paper).data,
-                'task_id': task.id
+                'message': 'Ingest started'
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f"ArXiv fetch failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['get'])
     def export_bibtex(self, request, pk=None):

@@ -31,7 +31,7 @@ class EmbeddingService:
         if not settings.GEMINI_API_KEY:
             logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model_name = "models/gemini-embedding-001"
+        self.model_name = "models/embedding-001"
 
     def generate_embedding(self, text: str) -> List[float]:
         """

@@ -22,7 +22,7 @@ services:
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
     # START: Makemigrations (for free tier) then Migrate then run services
     # We increase gunicorn timeout to 120s to prevent worker timeouts during heavy processing
-    startCommand: python manage.py makemigrations papers && python manage.py migrate && (celery -A core worker -l info --concurrency 1 & gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --timeout 120 --workers 2)
+    startCommand: python manage.py makemigrations papers && python manage.py migrate && (celery -A core worker -l info --concurrency 1 & gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --timeout 120 --workers 1)
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
