@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Paper, extractAllSections, deletePaper, extractMetadata, getMediaUrl } from '@/lib/api';
+import { Paper, extractAllSections, deletePaper, extractMetadata, getMediaUrl, getBibTeX } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useTaskPoll } from '@/hooks/useTaskPoll';
-import { Loader2, FileText, CheckCircle2, Trash2, ChevronDown, ChevronRight, Database, Award, List, Eye, X } from 'lucide-react';
+import { Loader2, FileText, CheckCircle2, Trash2, ChevronDown, ChevronRight, Database, Award, List, Eye, X, Download } from 'lucide-react';
 
 interface PaperItemProps {
     paper: Paper;
@@ -143,6 +143,35 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         }
     };
 
+    const handleExportBibtex = async () => {
+        try {
+            const data = await getBibTeX(paper.id);
+            const blob = new Blob([data.bibtex], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${paper.filename.split('.')[0]}.bib`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to generate BibTeX');
+        }
+    };
+
+    const renderAuthors = () => {
+        if (!paper.authors || paper.authors === "Unknown") return "Not Available";
+        try {
+            const parsed = JSON.parse(paper.authors);
+            if (Array.isArray(parsed)) return parsed.join(", ");
+        } catch (e) {
+            // Not JSON
+        }
+        return paper.authors;
+    };
+
 
     return (
         <Card className="mb-6 border-[#F1E9D2] shadow-sm hover:shadow-md transition-shadow rounded-2xl overflow-hidden bg-white">
@@ -211,6 +240,15 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 >
                                     {isLicLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Award className="h-3.5 w-3.5" />}
                                     Licenses
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
+                                    onClick={handleExportBibtex}
+                                >
+                                    <Download className="h-3.5 w-3.5" />
+                                    Cite
                                 </Button>
                             </div>
                         )}
@@ -387,7 +425,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                         Identifying...
                                     </span>
-                                ) : (paper.authors || "Not Available")}
+                                ) : renderAuthors()}
                             </p>
                         </div>
                     </div>

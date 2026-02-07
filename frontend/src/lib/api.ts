@@ -64,6 +64,8 @@ export interface Paper {
     uploadTaskId?: string;
     title?: string;
     authors?: string;
+    year?: string;
+    journal?: string;
     notes?: string;
     global_summary?: string;
 }
@@ -146,4 +148,14 @@ export const updatePaper = async (id: string, data: Partial<Paper>) => {
 export const extractMetadata = async (id: string, field: 'datasets' | 'licenses') => {
     const response = await api.post(`/papers/${id}/extract_metadata/`, { field });
     return response.data; // { task_id: ... }
+};
+
+export const ingestArxiv = async (url: string) => {
+    const response = await api.post('/papers/ingest_arxiv/', { url });
+    return response.data; // { paper: ..., task_id: ... }
+};
+
+export const getBibTeX = async (id: string) => {
+    const response = await api.get(`/papers/${id}/export_bibtex/`);
+    return response.data; // { bibtex: ... }
 };

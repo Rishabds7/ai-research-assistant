@@ -10,10 +10,14 @@ It uses Django Rest Framework (DRF) to handle:
 3. Polling for background task status.
 4. Bulk deletion of data.
 """
+import re
+import requests
+import json
 from rest_framework import viewsets, status, views
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.core.files.base import ContentFile
 
 from .models import Paper, Methodology, TaskStatus
 from .serializers import (
@@ -177,6 +181,100 @@ class PaperViewSet(viewsets.ModelViewSet):
         Paper.objects.all().delete()
         TaskStatus.objects.all().delete()
         return Response({'status': 'all papers and data deleted'}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'])
+    def ingest_arxiv(self, request):
+        """
+        Ingests a paper directly from ArXiv.
+        Accepts: {'url': 'https://arxiv.org/abs/2303.12345'} or {'url': '2303.12345'}
+        """
+        input_url = request.data.get('url', '').strip()
+        session_id = request.headers.get('X-Session-ID')
+
+        if not input_url:
+            return Response({'error': 'No ArXiv URL or ID provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Extract ArXiv ID using Regex
+        # Matches: 2303.12345, arxiv.org/abs/2303.12345, arxiv:2303.12345
+        match = re.search(r'(\d{4}\.\d{4,5})', input_url)
+        if not match:
+            return Response({'error': 'Could not parse ArXiv ID from input'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        arxiv_id = match.group(1)
+        pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+        filename = f"arxiv_{arxiv_id.replace('.', '_')}.pdf"
+
+        # 2. Duplicate Check
+        if session_id and Paper.objects.filter(filename=filename, session_id=session_id).exists():
+             return Response({'error': 'Paper already exists in your library.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # 3. Download PDF
+            response = requests.get(pdf_url, stream=True, timeout=30)
+            if response.status_code != 200:
+                # ArXiv might block if user-agent is missing, try with common one
+                headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+                response = requests.get(pdf_url, stream=True, timeout=30, headers=headers)
+                if response.status_code != 200:
+                    return Response({'error': f'ArXiv returned status {response.status_code}'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # 4. Save to DB
+            paper = Paper(filename=filename, session_id=session_id)
+            paper.file.save(filename, ContentFile(response.content), save=True)
+            
+            # 5. Trigger Task
+            task = process_pdf_task.delay(str(paper.id))
+            TaskStatus.objects.create(
+                task_id=task.id,
+                task_type='process_pdf',
+                status='pending'
+            )
+
+            return Response({
+                'paper': PaperDetailSerializer(paper).data,
+                'task_id': task.id
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'])
+    def export_bibtex(self, request, pk=None):
+        """
+        Generates a BibTeX entry for the paper.
+        """
+        paper = self.get_object()
+        
+        # Parse Authors
+        authors_list = []
+        try:
+            if paper.authors:
+                data = json.loads(paper.authors)
+                if isinstance(data, list):
+                    authors_list = data
+                else:
+                    authors_list = [paper.authors]
+            else:
+                authors_list = ["Unknown Author"]
+        except:
+            authors_list = [paper.authors] if paper.authors else ["Unknown Author"]
+
+        authors_str = " and ".join(authors_list)
+        
+        # Clean title for BibTeX key
+        safe_key = "".join(filter(str.isalnum, paper.title.split()[0] if paper.title else "paper"))
+        year_str = paper.year if paper.year and paper.year != "Unknown" else "2024"
+        cite_key = f"{safe_key.lower()}{year_str}"
+
+        bibtex = f"""@article{{{cite_key},
+  title={{{paper.title or paper.filename}}},
+  author={{{authors_str}}},
+  year={{{year_str}}},
+  journal={{{paper.journal if paper.journal and paper.journal != "Unknown" else "ArXiv Preprint"}}},
+  note={{Summarized via PaperDigest AI}}
+}}"""
+        
+        return Response({'bibtex': bibtex})
 
 
 class TaskStatusView(views.APIView):

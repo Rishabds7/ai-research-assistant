@@ -370,20 +370,29 @@ class GeminiLLMService:
         Uses first 10,000 characters to extract Title and Authors.
         Academic titles are usually prominent in the first few lines of raw text.
         """
-        prompt = """Extract the title and authors from this research paper.
+        prompt = """Extract the following metadata from this research paper:
+1. Title
+2. Authors
+3. Publication Year (if mentioned, otherwise "Unknown")
+4. Journal or Conference Name (if mentioned, otherwise "Unknown")
 
 Return ONLY a JSON object with this exact structure:
 {
     "title": "Full paper title",
-    "authors": ["Author One", "Author Two", "Author Three"]
+    "authors": ["Author One", "Author Two"],
+    "year": "2024",
+    "journal": "Nature / ArXiv / etc."
 }
-
-If you cannot find the information, use "Unknown".
 
 Text:
 """ + context[:12000]
         raw = self._generate(prompt)
-        return _parse_json_safe(raw, {"title": "Unknown", "authors": ["Unknown"]})
+        return _parse_json_safe(raw, {
+            "title": "Unknown", 
+            "authors": ["Unknown"], 
+            "year": "Unknown", 
+            "journal": "Unknown"
+        })
 
     def extract_datasets(self, context: str) -> list[str]:
         """

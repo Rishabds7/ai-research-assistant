@@ -12,17 +12,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getPapers, uploadPaper, Paper, deleteAllPapers } from "@/lib/api";
+import { getPapers, uploadPaper, Paper, deleteAllPapers, ingestArxiv } from "@/lib/api";
 import { PaperItem } from "@/components/PaperItem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"; // We'll use standard input for file upload
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, UploadCloud, Trash2 } from "lucide-react";
+import { Loader2, UploadCloud, Trash2, Link } from "lucide-react";
 import { ReviewTab } from "@/components/ReviewTab";
 
 export default function Home() {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
+  const [arxivUrl, setArxivUrl] = useState("");
+  const [isIngesting, setIsIngesting] = useState(false);
 
   const fetchPapers = async () => {
     try {
@@ -110,6 +112,39 @@ export default function Home() {
     }
   };
 
+  const handleArxivSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!arxivUrl.trim() || isIngesting) return;
+
+    setIsIngesting(true);
+    const tempId = `temp-arxiv-${Date.now()}`;
+
+    // Optimistic Update
+    const placeholder: Paper = {
+      id: tempId,
+      filename: "Fetching from ArXiv...",
+      processed: false,
+      uploaded_at: new Date().toISOString(),
+      file: '',
+      title: 'Connecting to ArXiv...',
+    } as Paper;
+
+    setPapers(prev => [placeholder, ...prev]);
+
+    try {
+      const res = await ingestArxiv(arxivUrl);
+      const newPaper = { ...res.paper, uploadTaskId: res.task_id };
+      setPapers(prev => prev.map(p => p.id === tempId ? newPaper : p));
+      setArxivUrl("");
+    } catch (e: any) {
+      console.error("ArXiv ingest failed", e);
+      setPapers(prev => prev.filter(p => p.id !== tempId));
+      alert(e.response?.data?.error || "Failed to ingest paper from ArXiv. Check the URL/ID.");
+    } finally {
+      setIsIngesting(false);
+    }
+  };
+
   const handleDeleteAll = async () => {
     if (confirm("Are you sure you want to delete ALL papers?")) {
       try {
@@ -145,6 +180,28 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-3">
+            <form onSubmit={handleArxivSubmit} className="flex items-center bg-white border border-[#F1E9D2] p-1 rounded-xl shadow-inner-sm mr-2 overflow-hidden">
+              <div className="flex items-center gap-2 px-3 text-slate-400">
+                <Link className="h-4 w-4" />
+              </div>
+              <Input
+                placeholder="ArXiv URL or ID (e.g. 2303.12345)"
+                className="border-none bg-transparent focus-visible:ring-0 w-48 text-sm"
+                value={arxivUrl}
+                onChange={(e) => setArxivUrl(e.target.value)}
+                disabled={isIngesting}
+              />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="sm"
+                className="rounded-lg h-9 font-bold text-[#1A365D] hover:bg-[#F1E9D2]/30"
+                disabled={isIngesting || !arxivUrl}
+              >
+                {isIngesting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fetch"}
+              </Button>
+            </form>
+
             {papers.length > 0 && (
               <Button
                 variant="ghost"

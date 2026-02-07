@@ -44,10 +44,11 @@ class Paper(models.Model):
     # 'task_ids' tracks active Celery background tasks to prevent duplicate processing
     task_ids = models.JSONField(default=dict, blank=True) # Tracking Celery tasks for this paper
     
-    # Research Branding Fields
     # These are populated using LLM extraction to show a professional 'Title' instead of just filename
-    title = models.CharField(max_length=1000, blank=True)
+    title = models.TextField(blank=True) # Changed to TextField to support very long titles
     authors = models.TextField(blank=True)
+    year = models.CharField(max_length=20, blank=True)
+    journal = models.CharField(max_length=500, blank=True)
     # Personal notes field allow researchers to map their own thoughts alongside AI insights
     notes = models.TextField(blank=True)
     # Global Summary is the 'TL;DR' table-level summary for the Review tab

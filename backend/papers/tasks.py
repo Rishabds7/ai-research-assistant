@@ -89,14 +89,17 @@ def process_pdf_task(self, paper_id):
             info = llm.extract_paper_info(paper.full_text[:10000])
             
             paper.title = sanitize_text(info.get('title', paper.filename))
+            paper.year = sanitize_text(info.get('year', 'Unknown'))
+            paper.journal = sanitize_text(info.get('journal', 'Unknown'))
+            
             authors_data = info.get('authors', 'Unknown')
             if isinstance(authors_data, list):
                 import json
                 paper.authors = json.dumps(authors_data)
             else:
                 paper.authors = sanitize_text(authors_data)
-            paper.save(update_fields=['title', 'authors'])
-            logger.info(f"Metadata identified: {paper.title}")
+            paper.save(update_fields=['title', 'authors', 'year', 'journal'])
+            logger.info(f"Metadata identified: {paper.title} ({paper.year})")
         except Exception as e:
             logger.error(f"Metadata extraction failed (non-fatal): {e}")
             if not paper.title:
