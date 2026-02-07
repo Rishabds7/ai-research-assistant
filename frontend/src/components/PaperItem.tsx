@@ -289,7 +289,12 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <div className="bg-[#1A365D]/5 p-3 rounded-xl border border-[#1A365D]/10">
                                     <h4 className="text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest mb-2 opacity-70">DATASETS:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {(!paper.metadata?.datasets?.length || paper.metadata.datasets[0] === "None mentioned") ? (
+                                        {isDsLoading ? (
+                                            <li className="text-[#1A365D]/60 italic flex items-center gap-2 animate-pulse">
+                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                Analyzing paper for datasets...
+                                            </li>
+                                        ) : (!paper.metadata?.datasets?.length || paper.metadata.datasets[0] === "None mentioned") ? (
                                             <li className="text-slate-500 italic flex items-center gap-2">
                                                 <div className="h-1 w-1 bg-slate-300 rounded-full"></div>
                                                 None mentioned
@@ -311,13 +316,18 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <div className="bg-[#D4AF37]/5 p-3 rounded-xl border border-[#D4AF37]/20">
                                     <h4 className="text-[10px] font-extrabold text-[#D4AF37] uppercase tracking-widest mb-2 opacity-70">LICENSES:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {(!paper.metadata?.licenses?.length || paper.metadata.licenses[0] === "None mentioned") ? (
+                                        {isLicLoading ? (
+                                            <li className="text-[#D4AF37]/60 italic flex items-center gap-2 animate-pulse">
+                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                Scanning for content licenses...
+                                            </li>
+                                        ) : (!paper.metadata?.licenses?.length || paper.metadata.licenses[0] === "None mentioned") ? (
                                             <li className="text-[#D4AF37]/60 italic flex items-center gap-2">
                                                 <div className="h-1 w-1 bg-[#D4AF37]/30 rounded-full"></div>
-                                                {licStatus === 'running' ? "Searching..." : "None mentioned"}
+                                                None mentioned
                                             </li>
                                         ) : (
-                                            paper.metadata.licenses.map((lic, i) => (
+                                            paper.metadata.licenses.map((lic: string, i: number) => (
                                                 <li key={i} className="text-slate-600 flex items-center gap-2 font-medium">
                                                     <div className="h-1 w-1 bg-[#D4AF37] rounded-full"></div>
                                                     {lic}

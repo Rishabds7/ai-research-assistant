@@ -143,6 +143,21 @@ class PaperViewSet(viewsets.ModelViewSet):
         if not paper.processed:
             return Response({'error': 'Paper not processed yet'}, status=status.HTTP_400_BAD_REQUEST)
             
+        # Consistency Check: If already running or already has data, don't start new
+        existing_task_id = paper.task_ids.get(field)
+        if existing_task_id:
+            try:
+                task_status = TaskStatus.objects.get(task_id=existing_task_id)
+                if task_status.status in ['pending', 'running']:
+                    return Response({'task_id': existing_task_id})
+                
+                # If it's already completed and we have data, just return the old task ID (frontend will see the status)
+                # Unless we want to force a refresh, but user wants "once for all".
+                if task_status.status == 'completed' and paper.metadata.get(field):
+                    return Response({'task_id': existing_task_id})
+            except TaskStatus.DoesNotExist:
+                pass
+
         task = extract_metadata_task.delay(str(paper.id), field)
         
         # Persist task_id for frontend recovery

@@ -262,7 +262,7 @@ def _extract_license_snippets(text: str) -> list[str]:
         snippet = text[start:end].replace("\n", " ").strip()
         snippets.append(snippet)
         
-    return snippets[:15]
+    return snippets[:25]
 
 
 def _extract_dataset_snippets(text: str) -> list[str]:
@@ -308,7 +308,7 @@ def _extract_dataset_snippets(text: str) -> list[str]:
         snippet = text[start:end].replace("\n", " ").strip()
         snippets.append(snippet)
         
-    return snippets[:15]
+    return snippets[:25]
 
 
 class GeminiLLMService:
@@ -320,7 +320,10 @@ class GeminiLLMService:
         if not GEMINI_API_KEY:
             logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=GEMINI_API_KEY)
-        self.model = genai.GenerativeModel(GEMINI_MODEL)
+        self.model = genai.GenerativeModel(
+            model_name=GEMINI_MODEL,
+            generation_config={"temperature": 0.1}
+        )
 
     def _generate(self, prompt: str) -> str:
         """
@@ -361,9 +364,8 @@ Text:
         Better than full-text extraction for long documents as it avoids dilution.
         """
         snippets = _extract_dataset_snippets(context)
-        if not snippets: return []
-        
         snippets_text = "\n---\n".join(snippets)
+        # LLM Call for identification
         prompt = f"""Extract ALL specific data sources and datasets mentioned in these snippets from a research paper.
 
 Look for:
@@ -375,13 +377,14 @@ Rules:
 1. Return ONLY a JSON array of specific names: ["Name1", "Name2", ...]
 2. Be specific (e.g., "ImageNet-1k" not just "ImageNet").
 3. Include names of podcasts/newsletters if explicitly mentioned.
-4. If no specific sources found, return [].
+4. If NO specific sources or datasets are found, return ["None mentioned"].
+5. Deduplicate and normalize names.
 
 Snippets:
 {snippets_text}"""
         raw = self._generate(prompt)
-        result = _parse_json_safe(raw, [])
-        return result if result else []
+        result = _parse_json_safe(raw, ["None mentioned"])
+        return result if result else ["None mentioned"]
 
     def extract_licenses(self, context: str) -> list[str]:
         """
@@ -392,44 +395,42 @@ Snippets:
         snippets = _extract_license_snippets(context)
         
         # 2. Optimization: Return empty if no keywords found
-        if not snippets:
-            return []
-            
         # 3. LLM Call with pure evidence
         snippets_text = "\n---\n".join(snippets)
-        prompt = f"""You are a professional research librarian. Analyze these snippets from a research paper and identifying the exact software or content licenses mentioned.
+        prompt = f"""You are a professional research librarian and copyright expert. Analyze these snippets from a research paper and identify the EXACT software, data, or content licenses mentioned.
 
 Rules:
-1. Return a JSON LIST of objects: [{{"license": "Exact Name", "evidence": "Quote from text"}}]
-2. LOOK for: MIT, Apache 2.0, Creative Commons (CC BY, CC0, etc.), GPL, BSD, etc.
-3. Check figure captions or footnotes for "Reproduced with permission" or "licensed under".
-4. If a license applies to a specific dataset (e.g. COCO: CC BY 4.0), specify that.
-5. If no explicit license is stated, return [].
-6. Deduplicate entries.
+1. Return a JSON LIST of strings: ["License Name 1", "License Name 2"]
+2. LOOK AGGRESSIVELY for: MIT, Apache 2.0, Creative Commons (CC BY, CC0, CC BY-SA, CC BY-NC), GPL, BSD, etc.
+3. Check specifically for citations like "Reproduced with permission from [Source]" or software snippets.
+4. If a license applies to a specific dataset or tool used, include it.
+5. If NO explicit license is stated anywhere in the evidence, return ["None mentioned"].
+6. Deduplicate and normalize names (e.g., use "CC BY 4.0" instead of just "Creative Commons").
 
 Snippets:
 {snippets_text}
 
-Return ONLY JSON."""
+Return ONLY a JSON list of strings."""
         
         raw = self._generate(prompt)
         items = _parse_json_safe(raw, [])
         
-        # 4. Deduplication logic
+        # Consistent cleaning
         licenses = []
         seen = set()
         for item in items:
-            if isinstance(item, dict) and 'license' in item:
+            if isinstance(item, str):
+                lic = item.strip()
+                if lic and lic.lower() not in seen:
+                    licenses.append(lic)
+                    seen.add(lic.lower())
+            elif isinstance(item, dict) and 'license' in item:
                 lic = item['license'].strip()
                 if lic and lic.lower() not in seen:
                     licenses.append(lic)
                     seen.add(lic.lower())
-            elif isinstance(item, str):
-                if item and item.lower() not in seen:
-                    licenses.append(item)
-                    seen.add(item.lower())
-                    
-        return licenses
+        
+        return licenses if licenses else ["None mentioned"]
 
     def _pre_clean_content(self, text: str) -> str:
         """
