@@ -192,9 +192,25 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                             )}
 
                             {!paper.processed && !paper.uploadTaskId?.includes('failed') && (
-                                <div className="flex items-center gap-2 mt-1 text-[10px] text-blue-500 font-bold uppercase tracking-widest animate-pulse">
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                    Deep Analysis in Progress...
+                                <div className="flex flex-col gap-2 mt-2">
+                                    <div className="flex items-center gap-2 text-[10px] text-blue-500 font-bold uppercase tracking-widest animate-pulse">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        {processStatus === 'timeout' ? (
+                                            <span className="text-amber-500 underline decoration-dotted">Analysis delayed (Worker busy)</span>
+                                        ) : (
+                                            <span>Deep Analysis in Progress...</span>
+                                        )}
+                                    </div>
+                                    {(processStatus === 'timeout' || processStatus === 'failed') && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-fit h-6 text-[9px] px-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                                            onClick={() => onUpdate()}
+                                        >
+                                            Refresh Status
+                                        </Button>
+                                    )}
                                 </div>
                             )}
 

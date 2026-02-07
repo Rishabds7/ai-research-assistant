@@ -57,28 +57,40 @@ class PaperViewSet(viewsets.ModelViewSet):
             # For this demo, let's return nothing to encourage frontend to send the ID.
             queryset = queryset.none()
         
-        # SELF-HEALING: Find orphaned papers (unprocessed, created > 2 mins ago)
-        two_minutes_ago = timezone.now() - timedelta(minutes=2)
+        # SELF-HEALING: Find orphaned papers (unprocessed, created > 1 min ago)
+        one_minute_ago = timezone.now() - timedelta(minutes=1)
         orphaned_papers = queryset.filter(
             processed=False,
-            uploaded_at__lt=two_minutes_ago
+            uploaded_at__lt=one_minute_ago
         )
         
         # Re-trigger processing for orphaned papers
         for paper in orphaned_papers:
-            # Check if there's already a pending task for this paper
-            existing_task = TaskStatus.objects.filter(
-                result__icontains=str(paper.id),
-                status__in=['pending', 'running']
-            ).first()
+            # Check if we have an active process_pdf task for this paper
+            active_task_id = paper.task_ids.get('process_pdf')
+            should_retrigger = True
             
-            if not existing_task:
+            if active_task_id:
+                existing_task = TaskStatus.objects.filter(task_id=active_task_id).first()
+                # If task is already pending or running, don't double-trigger
+                if existing_task and existing_task.status in ['pending', 'running']:
+                    should_retrigger = False
+            
+            if should_retrigger:
                 # Re-trigger the processing task
                 task = process_pdf_task.delay(str(paper.id))
-                TaskStatus.objects.create(
+                
+                # Update task_ids on paper
+                paper.task_ids['process_pdf'] = task.id
+                paper.save(update_fields=['task_ids'])
+                
+                # Create/Update TaskStatus
+                TaskStatus.objects.update_or_create(
                     task_id=task.id,
-                    task_type='process_pdf',
-                    status='pending'
+                    defaults={
+                        'task_type': 'process_pdf',
+                        'status': 'pending'
+                    }
                 )
             
         return queryset.order_by('-uploaded_at')

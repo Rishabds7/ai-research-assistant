@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getTaskStatus } from '@/lib/api';
 
-const MAX_POLL_TIME_MS = 120000; // 2 minutes timeout
+const MAX_POLL_TIME_MS = 300000; // 5 minutes timeout
 
 export function useTaskPoll(taskId: string | null, onComplete?: (result: any) => void) {
     const [status, setStatus] = useState<string>('idle');
