@@ -253,22 +253,32 @@ class PaperViewSet(viewsets.ModelViewSet):
             # 5. Trigger Task (Resiliently)
             from django.db import transaction
             
-            def trigger_task():
-                task = process_pdf_task.delay(str(paper.id))
-                TaskStatus.objects.create(
+            # We generate the task ID immediately but delay execution 
+            # lightly to ensure DB consistency
+            task = process_pdf_task.delay(str(paper.id))
+            
+            # Save task ID to paper metadata for frontend persistence
+            paper.task_ids['process_pdf'] = task.id
+            paper.save(update_fields=['task_ids'])
+
+            def create_status_record():
+                TaskStatus.objects.get_or_create(
                     task_id=task.id,
-                    task_type='process_pdf',
-                    status='pending'
+                    defaults={
+                        'task_type': 'process_pdf',
+                        'status': 'pending'
+                    }
                 )
             
             if transaction.get_connection().in_atomic_block:
-                transaction.on_commit(trigger_task)
+                transaction.on_commit(create_status_record)
             else:
-                trigger_task()
+                create_status_record()
 
             return Response({
                 'paper': PaperDetailSerializer(paper).data,
-                'message': 'Ingest started'
+                'task_id': task.id,
+                'message': 'ArXiv ingestion started'
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:

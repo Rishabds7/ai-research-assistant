@@ -12,10 +12,9 @@ interface PaperItemProps {
 
 export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [processTaskId, setProcessTaskId] = useState<string | null>(
-        !paper.processed ? (paper.uploadTaskId || null) : null
+        !paper.processed ? (paper.uploadTaskId || paper.task_ids?.process_pdf || null) : null
     );
     const [summarizeTaskId, setSummarizeTaskId] = useState<string | null>(
-
         (!paper.section_summaries || paper.section_summaries.length === 0) ? (paper.task_ids?.summarize || null) : null
     );
     const [datasetsTaskId, setDatasetsTaskId] = useState<string | null>(
@@ -38,9 +37,11 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
 
     // Sync task IDs from paper.task_ids if they become available or update
     useEffect(() => {
-        if (!paper.processed && paper.uploadTaskId) {
-            setProcessTaskId(paper.uploadTaskId);
+        if (!paper.processed) {
+            const taskId = paper.uploadTaskId || paper.task_ids?.process_pdf;
+            if (taskId) setProcessTaskId(taskId);
         }
+
         if (paper.task_ids?.summarize && (!paper.section_summaries || paper.section_summaries.length === 0)) {
             setSummarizeTaskId(paper.task_ids.summarize);
         }

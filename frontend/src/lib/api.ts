@@ -57,6 +57,7 @@ export interface Paper {
         licenses?: string[];
     };
     task_ids?: {
+        process_pdf?: string;
         summarize?: string;
         datasets?: string;
         licenses?: string;
