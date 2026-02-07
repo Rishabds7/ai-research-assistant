@@ -46,7 +46,7 @@ class Paper(models.Model):
     
     # Research Branding Fields
     # These are populated using LLM extraction to show a professional 'Title' instead of just filename
-    title = models.CharField(max_length=500, blank=True)
+    title = models.CharField(max_length=1000, blank=True)
     authors = models.TextField(blank=True)
     # Personal notes field allow researchers to map their own thoughts alongside AI insights
     notes = models.TextField(blank=True)

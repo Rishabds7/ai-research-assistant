@@ -79,18 +79,16 @@ def process_pdf_task(self, paper_id):
         paper.sections = sanitize_text(data['sections'])
         paper.processed = True
         paper.save(update_fields=['full_text', 'sections', 'processed'])
-        logger.info("Text extraction successful.")
+        logger.info("Basic text extraction successful. Paper marked as processed.")
 
-        # 2. Metadata Extraction
+        # 2. Metadata Extraction (Optional, don't fail the whole task if this errors)
         try:
             logger.info("Calling Gemini for metadata extraction...")
             llm = LLMService()
             # Send just the first 10k chars for metadata (fast)
             info = llm.extract_paper_info(paper.full_text[:10000])
-            title = sanitize_text(info.get('title', 'Unknown'))
             
-            paper.title = title
-            
+            paper.title = sanitize_text(info.get('title', paper.filename))
             authors_data = info.get('authors', 'Unknown')
             if isinstance(authors_data, list):
                 import json
@@ -99,26 +97,39 @@ def process_pdf_task(self, paper_id):
                 paper.authors = sanitize_text(authors_data)
             paper.save(update_fields=['title', 'authors'])
             logger.info(f"Metadata identified: {paper.title}")
-        except ValueError as ve:
-            # Re-raise validation errors to be caught nicely
-            raise ve
         except Exception as e:
-            logger.error(f"Metadata error: {e}")
+            logger.error(f"Metadata extraction failed (non-fatal): {e}")
+            if not paper.title:
+                paper.title = paper.filename
+                paper.save(update_fields=['title'])
             
-        # 3. Generate Visual Semantic Space (Embeddings)
-        logger.info("Starting batch embedding generation (Google Cloud)...")
-        embed_service = EmbeddingService()
-        embed_service.store_embeddings(paper, paper.sections)
-        logger.info("Embedding generation successful.")
-        
         update_task_status(task_id, 'completed', result={"paper_id": str(paper.id)})
-        logger.info(f"Task {task_id} completed successfully.")
+        
+        # 3. Trigger Embeddings in a separate background task (Lower Priority / Non-Blocking)
+        generate_embeddings_task.delay(str(paper.id))
+        
+        logger.info(f"Task {task_id} completed successfully. Embeddings triggered.")
         return {"status": "success", "paper_id": str(paper.id)}
         
     except Exception as e:
         logger.error(f"FATAL Task Error {task_id}: {e}")
         update_task_status(task_id, 'failed', error=str(e))
         raise
+
+@shared_task(bind=True)
+def generate_embeddings_task(self, paper_id):
+    """
+    NON-BLOCKING TASK: Generate semantic vectors for RAG search.
+    This runs after the paper is already 'Ready' in the UI.
+    """
+    try:
+        paper = Paper.objects.get(id=paper_id)
+        logger.info(f"Generating embeddings for {paper.filename}...")
+        embed_service = EmbeddingService()
+        embed_service.store_embeddings(paper, paper.sections)
+        logger.info("Embeddings complete.")
+    except Exception as e:
+        logger.error(f"Embeddings failed: {e}")
 
 @shared_task(bind=True)
 def extract_methodology_task(self, paper_id):
