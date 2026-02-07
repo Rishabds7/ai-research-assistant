@@ -27,6 +27,12 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
     const [isSummariesVisible, setIsSummariesVisible] = useState(true);
     const [showPdf, setShowPdf] = useState(false);
+    const [showDatasets, setShowDatasets] = useState(
+        !!(paper.task_ids?.datasets || (paper.metadata?.datasets && paper.metadata.datasets.length > 0))
+    );
+    const [showLicenses, setShowLicenses] = useState(
+        !!(paper.task_ids?.licenses || (paper.metadata?.licenses && paper.metadata.licenses.length > 0))
+    );
 
     // Sync task IDs from paper.task_ids if they become available or update
     useEffect(() => {
@@ -42,6 +48,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         if (paper.task_ids?.licenses && (!paper.metadata?.licenses || paper.metadata.licenses.length === 0)) {
             setLicensesTaskId(paper.task_ids.licenses);
         }
+        if (paper.task_ids?.datasets) setShowDatasets(true);
+        if (paper.task_ids?.licenses) setShowLicenses(true);
     }, [paper.task_ids, paper.section_summaries, paper.metadata, paper.processed, paper.uploadTaskId]);
 
 
@@ -85,6 +93,9 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     };
 
     const handleExtractMetadata = async (field: 'datasets' | 'licenses') => {
+        if (field === 'datasets') setShowDatasets(true);
+        else setShowLicenses(true);
+
         try {
             const data = await extractMetadata(paper.id, field);
             if (!data?.task_id) throw new Error("No task ID returned");
@@ -282,14 +293,14 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     </div>
 
                     {/* Metadata Results (Simple Lists) - Only show if requested or loading */}
-                    {(datasetsTaskId || paper.task_ids?.datasets || licensesTaskId || paper.task_ids?.licenses) && (
+                    {(showDatasets || showLicenses) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Datasets Box */}
-                            {(datasetsTaskId || paper.task_ids?.datasets) && (
+                            {showDatasets && (
                                 <div className="bg-[#1A365D]/5 p-3 rounded-xl border border-[#1A365D]/10">
                                     <h4 className="text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest mb-2 opacity-70">DATASETS:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {isDsLoading ? (
+                                        {(dsStatus === 'running' || dsStatus === 'pending' || datasetsTaskId) ? (
                                             <li className="text-[#1A365D]/60 italic flex items-center gap-2 animate-pulse">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                                 Analyzing paper for datasets...
@@ -312,11 +323,11 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                             )}
 
                             {/* Licenses Box */}
-                            {(licensesTaskId || paper.task_ids?.licenses) && (
+                            {showLicenses && (
                                 <div className="bg-[#D4AF37]/5 p-3 rounded-xl border border-[#D4AF37]/20">
                                     <h4 className="text-[10px] font-extrabold text-[#D4AF37] uppercase tracking-widest mb-2 opacity-70">LICENSES:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {isLicLoading ? (
+                                        {(licStatus === 'running' || licStatus === 'pending' || licensesTaskId) ? (
                                             <li className="text-[#D4AF37]/60 italic flex items-center gap-2 animate-pulse">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                                 Scanning for content licenses...

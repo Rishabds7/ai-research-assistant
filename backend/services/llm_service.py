@@ -226,16 +226,23 @@ def _extract_license_snippets(text: str) -> list[str]:
         r"figure", r"fig\.", r"caption", 
         r"reproduced from", r"adapted from", 
         r"permission granted", r"©",
-        r"distribution", r"terms of use", r"proprietary"
+        r"distribution", r"terms of use", r"proprietary",
+        r"github\.com", r"open source", r"available at", r"under the terms",
+        r"repository", r"software license"
     ]
     
     combined_pattern = "|".join(keywords)
     matches = list(re.finditer(combined_pattern, text, re.IGNORECASE))
     
+    # Always include the head and tail of the paper (highest density for metadata/acknowledgments)
+    snippets = [
+        f"[BEGINNING OF PAPER] {text[:5000].replace('\n', ' ')}",
+        f"[END OF PAPER] {text[-5000:].replace('\n', ' ')}"
+    ]
+    
     if not matches:
-        return []
+        return snippets
         
-    snippets = []
     # Increased context size to capture headers and citations
     CONTEXT_SIZE = 800
     
