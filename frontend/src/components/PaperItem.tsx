@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Paper, extractAllSections, deletePaper, extractMetadata } from '@/lib/api';
+import { Paper, extractAllSections, deletePaper, extractMetadata, getMediaUrl } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useTaskPoll } from '@/hooks/useTaskPoll';
@@ -216,7 +216,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 </Button>
                             </div>
                             <object
-                                data={`${paper.file}#view=FitH`}
+                                data={`${getMediaUrl(paper.file)}#view=FitH`}
                                 type="application/pdf"
                                 className="w-full h-[650px] border-none"
                             >
@@ -225,7 +225,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                     <p className="text-slate-600 font-medium mb-2">Unable to display PDF directly.</p>
                                     <p className="text-slate-400 text-sm mb-6">Your browser might be blocking the embedded viewer.</p>
                                     <a
-                                        href={paper.file}
+                                        href={getMediaUrl(paper.file)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 py-2 px-4 shadow-sm"
@@ -240,7 +240,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                     Viewing: {paper.filename} (Original Document)
                                 </span>
                                 <a
-                                    href={paper.file}
+                                    href={getMediaUrl(paper.file)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="underline hover:text-blue-300 font-bold"

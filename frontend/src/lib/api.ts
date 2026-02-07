@@ -15,6 +15,13 @@ export const api = axios.create({
     baseURL: API_URL,
 });
 
+export const getMediaUrl = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    const baseUrl = API_URL.replace('/api', '');
+    return `${baseUrl}${path}`;
+};
+
 // Helper to get or create a persistent session ID
 const getSessionId = () => {
     if (typeof window === 'undefined') return '';

@@ -47,30 +47,40 @@ export default function Home() {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
 
-      // Duplicate Check: Prevents redundant AI processing and DB storage.
+      // Duplicate Check
       const newFiles = selectedFiles.filter(file =>
         !papers.some(p => p.filename === file.name)
       );
-
-      if (newFiles.length < selectedFiles.length) {
-        console.warn(`${selectedFiles.length - newFiles.length} files skipped (duplicates).`);
-      }
 
       if (newFiles.length === 0) {
         e.target.value = '';
         return;
       }
 
-      // PARALLEL UPLOAD LOGIC
       setUploadingCount(prev => prev + newFiles.length);
 
-      await Promise.all(newFiles.map(async (file) => {
+      // OPTIMISTIC UPDATES: Show "ghost" cards immediately
+      const placeholders = newFiles.map(file => ({
+        id: `temp-${file.name}-${Date.now()}`,
+        filename: file.name,
+        processed: false,
+        uploaded_at: new Date().toISOString(),
+        file: '',
+        title: 'Extracting...',
+      } as Paper));
+
+      setPapers(prev => [...placeholders, ...prev]);
+
+      await Promise.all(newFiles.map(async (file, idx) => {
         try {
           const res = await uploadPaper(file);
           const newPaper = { ...res.paper, uploadTaskId: res.task_id };
-          setPapers((prev) => [newPaper, ...prev]);
+          // Replace placeholder with real paper data
+          setPapers(prev => prev.map(p => p.id === placeholders[idx].id ? newPaper : p));
         } catch (e: any) {
           console.error(`Upload failed: ${file.name}`, e);
+          // Remove placeholder on failure
+          setPapers(prev => prev.filter(p => p.id !== placeholders[idx].id));
           if (e.response?.data?.error) alert(e.response.data.error);
           else alert(`Connection issue while uploading ${file.name}.`);
         } finally {
@@ -111,7 +121,7 @@ export default function Home() {
                 PaperDigest <span className="text-[#D4AF37]">AI</span>
               </h1>
               <p className="text-slate-500 font-medium tracking-wide">
-                Synthesizing deep research into actionable insights
+                Transform research paper into actionable insights
               </p>
             </div>
           </div>

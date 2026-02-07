@@ -476,13 +476,16 @@ Return ONLY JSON."""
             if mapped_content:
                 mapped_sections[standard_section] = '\n\n'.join(mapped_content)
 
-        # SMART FALLBACK: If Abstract is missing, assume it's the first 10k chars (common for non-standard PDFs)
+        # SMART FALLBACKS:
         if (not mapped_sections.get('Abstract') or len(mapped_sections['Abstract']) < 100) and full_text:
             mapped_sections['Abstract'] = full_text[:8000]
 
-        # SMART FALLBACK: If Conclusion is missing, take the last 8k chars
+        if (not mapped_sections.get('Introduction') or len(mapped_sections['Introduction']) < 100) and full_text:
+            # Avoid repeating the abstract exactly, take a chunk that usually contains the Intro
+            mapped_sections['Introduction'] = full_text[3000:15000]
+
         if (not mapped_sections.get('Conclusion') or len(mapped_sections['Conclusion']) < 100) and full_text:
-            mapped_sections['Conclusion'] = full_text[-8000:]
+            mapped_sections['Conclusion'] = full_text[-10000:]
         
         # Generate summaries for each standard section
         summaries = {}
