@@ -204,17 +204,6 @@ export default function Home() {
 
             <div className="text-[#1A365D]/30 font-bold text-[10px] tracking-widest px-2">OR</div>
 
-            {papers.length > 0 && (
-              <Button
-                variant="ghost"
-                onClick={handleDeleteAll}
-                className="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                title="Delete all papers"
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
-            )}
-
             <input
               id="file-upload-input"
               type="file"
@@ -244,20 +233,34 @@ export default function Home() {
         </div>
 
         <Tabs defaultValue="papers" className="w-full">
-          <TabsList className="flex w-full max-w-md mx-auto bg-[#F1E9D2]/30 p-1 rounded-xl mb-8 border border-[#F1E9D2]/50">
-            <TabsTrigger
-              value="papers"
-              className="flex-1 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all"
-            >
-              📄 Documents
-            </TabsTrigger>
-            <TabsTrigger
-              value="review"
-              className="flex-1 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all"
-            >
-              📋 AI Review
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-8">
+            <TabsList className="bg-[#F1E9D2]/30 p-1 rounded-xl border border-[#F1E9D2]/50">
+              <TabsTrigger
+                value="papers"
+                className="px-8 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all font-bold"
+              >
+                📄 Documents
+              </TabsTrigger>
+              <TabsTrigger
+                value="review"
+                className="px-8 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all font-bold"
+              >
+                📋 AI Review
+              </TabsTrigger>
+            </TabsList>
+
+            {papers.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteAll}
+                className="border-red-100 text-red-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-all font-bold px-4 h-10 rounded-xl flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete All
+              </Button>
+            )}
+          </div>
 
           <TabsContent value="papers" className="space-y-6">
             {papers.length === 0 ? (
@@ -283,6 +286,6 @@ export default function Home() {
           </TabsContent>
         </Tabs>
       </div>
-    </main>
+    </main >
   );
 }

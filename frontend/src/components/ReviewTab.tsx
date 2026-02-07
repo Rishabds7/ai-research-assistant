@@ -50,13 +50,23 @@ interface ReviewTabProps {
 }
 
 export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
+    const [expandedPapers, setExpandedPapers] = useState<Set<string>>(new Set());
     const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
     const [notes, setNotes] = useState("");
 
-    // Only show papers that have been summarized
+    // Only show papers that have been summarized (Stage 2 complete)
     const reviewedPapers = papers.filter(
-        (p) => p.section_summaries && p.section_summaries.length > 0
+        (p) => (p.section_summaries && p.section_summaries.length > 0) || p.global_summary
     );
+
+    const toggleExpand = (id: string) => {
+        setExpandedPapers(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     const handleEditNotes = (paper: Paper) => {
         setEditingPaper(paper);
@@ -126,65 +136,74 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-[#F1E9D2]/20 hover:bg-[#F1E9D2]/20">
-                                <TableHead className="w-[200px] font-bold text-[#1A365D]">Document</TableHead>
+                                <TableHead className="w-[180px] font-bold text-[#1A365D]">Document</TableHead>
                                 <TableHead className="font-bold text-[#1A365D]">AI Synthesis</TableHead>
                                 <TableHead className="w-[250px] font-bold text-[#1A365D]">Personal Notes</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {reviewedPapers.map((paper) => (
-                                <TableRow key={paper.id} className="border-[#F1E9D2]/50 hover:bg-[#FDFBF7]/50 transition-colors">
-                                    <TableCell className="align-top py-6">
-                                        <div className="font-bold text-[#1A365D] mb-1 leading-tight wrap-break-word">
+                            {reviewedPapers.map((paper) => {
+                                const isExpanded = expandedPapers.has(paper.id);
+                                return (
+                                    <TableRow key={paper.id} className="border-[#F1E9D2]/50 hover:bg-[#FDFBF7]/50 transition-colors">
+                                        <TableCell className="align-top py-6 font-medium text-[#1A365D] text-xs">
                                             {paper.filename}
-                                        </div>
-                                        {paper.title && (
-                                            <div className="text-[11px] text-slate-500 leading-snug mt-3 pt-3 border-t border-[#F1E9D2]/30">
-                                                <span className="font-bold text-[#D4AF37] uppercase tracking-tight">TITLE: </span>
-                                                <span className="italic">{paper.title}</span>
+                                        </TableCell>
+                                        <TableCell className="align-top py-6">
+                                            <div
+                                                className="cursor-pointer group flex flex-col gap-2"
+                                                onClick={() => toggleExpand(paper.id)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`transition-transform duration-200 text-[#D4AF37] ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+                                                    <span className="font-extrabold text-[#1A365D] group-hover:text-[#D4AF37] transition-colors leading-tight">
+                                                        {paper.title || paper.filename}
+                                                    </span>
+                                                </div>
+
+                                                {isExpanded && (
+                                                    <div className="mt-4 pl-6 animate-in slide-in-from-top-2 duration-300">
+                                                        {paper.global_summary ? (
+                                                            <ul className="text-xs space-y-3 text-slate-600">
+                                                                {paper.global_summary.split(/\r?\n/).filter(p => {
+                                                                    const clean = p.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim();
+                                                                    if (!clean || clean.length < 5) return false;
+                                                                    if (clean.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return false;
+                                                                    return true;
+                                                                }).map((point, i) => (
+                                                                    <li key={i} className="flex gap-3 leading-relaxed">
+                                                                        <span className="text-[#D4AF37] font-bold shrink-0">◇</span>
+                                                                        <span>{point.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim().replace(/\s+/g, ' ')}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        ) : (
+                                                            <p className="text-xs text-slate-400 italic">No summary generated yet.</p>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="align-top py-6">
-                                        {paper.global_summary ? (
-                                            <ul className="text-xs space-y-3 text-slate-600">
-                                                {paper.global_summary.split(/\r?\n/).filter(p => {
-                                                    const clean = p.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim();
-                                                    if (!clean || clean.length < 5) return false;
-                                                    // Filter out common header leftovers
-                                                    if (clean.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return false;
-                                                    return true;
-                                                }).map((point, i) => (
-                                                    <li key={i} className="flex gap-3 leading-relaxed">
-                                                        <span className="text-[#D4AF37] font-bold shrink-0">◇</span>
-                                                        {/* Clean and normalize whitespace for display */}
-                                                        <span>{point.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim().replace(/\s+/g, ' ')}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-xs text-slate-400 italic">No summary generated yet.</p>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="align-top py-6">
-                                        <div
-                                            onClick={() => handleEditNotes(paper)}
-                                            className="cursor-pointer group relative p-3 rounded-xl hover:bg-[#FDFBF7] border border-transparent hover:border-[#F1E9D2] transition-all min-h-[80px]"
-                                        >
-                                            {paper.notes ? (
-                                                <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
-                                                    {paper.notes}
-                                                </p>
-                                            ) : (
-                                                <p className="text-xs text-slate-300 italic">
-                                                    Click to add your insights...
-                                                </p>
-                                            )}
-                                            <FileEdit className="absolute top-2 right-2 h-3.5 w-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                        </TableCell>
+                                        <TableCell className="align-top py-6">
+                                            <div
+                                                onClick={() => handleEditNotes(paper)}
+                                                className="cursor-pointer group relative p-3 rounded-xl hover:bg-[#FDFBF7] border border-transparent hover:border-[#F1E9D2] transition-all min-h-[80px]"
+                                            >
+                                                {paper.notes ? (
+                                                    <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                                        {paper.notes}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-slate-300 italic">
+                                                        Click to add your insights...
+                                                    </p>
+                                                )}
+                                                <FileEdit className="absolute top-2 right-2 h-3.5 w-3.5 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </div>
