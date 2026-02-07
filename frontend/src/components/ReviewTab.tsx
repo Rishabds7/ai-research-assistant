@@ -122,7 +122,7 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center bg-white/50 p-6 rounded-2xl border border-[#F1E9D2] mb-8">
-                <h2 className="text-2xl font-bold text-[#1A365D]">Literature Review Synthesis</h2>
+                <h2 className="text-2xl font-bold text-[#1A365D]">Literature Review</h2>
                 <Button
                     variant="outline"
                     onClick={downloadCSV}
@@ -179,8 +179,8 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                                             {/* Header Row */}
                                             <div className="col-span-3 grid grid-cols-[220px_1fr_300px] border-b border-[#F1E9D2]/50 bg-[#F1E9D2]/20">
                                                 <div className="px-8 py-3 text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest border-r border-[#F1E9D2]/50">Document</div>
-                                                <div className="px-10 py-3 text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest border-r border-[#F1E9D2]/50">AI Synthesis & Global Summary</div>
-                                                <div className="px-8 py-3 text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest text-right">Research Notes</div>
+                                                <div className="px-10 py-3 text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest border-r border-[#F1E9D2]/50">Global Summary</div>
+                                                <div className="px-8 py-3 text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest">Research Notes</div>
                                             </div>
 
                                             {/* Content Columns */}
@@ -210,7 +210,7 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                                                                 return true;
                                                             }).slice(0, 10).map((point, i) => (
                                                                 <li key={i} className="flex gap-4 leading-relaxed group">
-                                                                    <div className="mt-1.5 flex-shrink-0">
+                                                                    <div className="mt-1.5 shrink-0">
                                                                         <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
                                                                     </div>
                                                                     <span className="group-hover:text-black transition-colors">{point.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim().replace(/\s+/g, ' ')}</span>
