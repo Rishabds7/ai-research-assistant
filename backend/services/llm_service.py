@@ -413,35 +413,40 @@ Snippets:
         result = _parse_json_safe(raw, ["None mentioned"])
         return result if result else ["None mentioned"]
 
-    def extract_licenses(self, context: str) -> list[str]:
+    def extract_licenses(self, paper_text: str) -> list[str]:
         """
-        Advanced multi-pass license identification. 
-        Scans SNIPPETS from the ENTIRE paper for maximum recall.
+        Extracts licenses by scanning the WHOLE paper.
+        Gemini 1.5 Flash handles ~1M tokens, so we can afford to send the full text
+        of most papers (usually < 50k tokens) for maximum accuracy.
         """
-        # 1. Snippet Finding (Heuristic Filter across full text)
-        snippets = _extract_license_snippets(context)
+        # 1. Cap the text to a very large but safe limit (approx 30k-40k tokens)
+        # This covers 99% of research papers entirely.
+        full_context = paper_text[:200000]
         
-        # 2. Optimization: Return empty if no keywords found
-        # 3. LLM Call with pure evidence
-        snippets_text = "\n---\n".join(snippets)
         prompt = f"""You are a professional research librarian and license compliance auditor. 
-Your goal is to identify ALL licenses and usage terms mentioned in the research paper. This includes licenses for the paper itself, the source code, any models released, AND the datasets used or introduced.
+Your goal is to identify ALL licenses and usage terms mentioned in the research paper below. 
+
+Scope of Search:
+1. Licenses for the paper itself (e.g., CC BY 4.0).
+2. Licenses for source code or repositories mentioned (e.g., MIT, Apache).
+3. Licenses for datasets used or introduced (e.g., "available for non-commercial research").
+4. Any mention of "reproduced with permission", "copyright ©", or "under the terms of".
 
 Rules:
 1. Return ONLY a JSON LIST of strings: ["MIT License", "CC BY 4.0", ...]
-2. LOOK AGGRESSIVELY: Often licenses are in footnotes, acknowledgments, Figure Captions, or "Data availability" sections.
-3. Check for specific usage restrictions (e.g., "available for non-commercial research", "distributed under a restricted license").
-4. If a repository or project website is mentioned, check if a license is specified for it.
-5. If NO explicit license or clear usage terms are found in the evidence, return ["None mentioned"].
-6. Deduplicate entries and normalize to standard names.
+2. SCROLL THROUGH THE ENTIRE TEXT. Check figure captions, footnotes, and the very end of the paper.
+3. If NO explicit license or clear usage terms are found, return ["None mentioned"].
+4. Deduplicate and use standard names.
 
-Snippets from Paper:
-{snippets_text}
+Paper Text:
+---
+{full_context}
+---
 
 Return ONLY a JSON list of strings."""
         
         raw = self._generate(prompt)
-        items = _parse_json_safe(raw, [])
+        items = _parse_json_safe(raw, ["None mentioned"])
         
         # Consistent cleaning
         licenses = []
@@ -449,11 +454,6 @@ Return ONLY a JSON list of strings."""
         for item in items:
             if isinstance(item, str):
                 lic = item.strip()
-                if lic and lic.lower() not in seen:
-                    licenses.append(lic)
-                    seen.add(lic.lower())
-            elif isinstance(item, dict) and 'license' in item:
-                lic = item['license'].strip()
                 if lic and lic.lower() not in seen:
                     licenses.append(lic)
                     seen.add(lic.lower())

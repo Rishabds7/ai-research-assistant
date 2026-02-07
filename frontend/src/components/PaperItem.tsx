@@ -124,6 +124,10 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         }
     };
 
+    const isSumLoading = !!summarizeTaskId && (sumStatus === 'idle' || sumStatus === 'pending' || sumStatus === 'running');
+    const isDsLoading = isDsRequesting || (!!datasetsTaskId && (dsStatus === 'idle' || dsStatus === 'pending' || dsStatus === 'running'));
+    const isLicLoading = isLicRequesting || (!!licensesTaskId && (licStatus === 'idle' || licStatus === 'pending' || licStatus === 'running'));
+
     const toggleSection = (name: string) => {
         setExpandedSections(prev => ({ ...prev, [name]: !prev[name] }));
     };
@@ -138,10 +142,6 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
             alert('Failed to delete paper');
         }
     };
-
-    const isSumLoading = !!summarizeTaskId && (sumStatus === 'idle' || sumStatus === 'pending' || sumStatus === 'running');
-    const isDsLoading = !!datasetsTaskId && (dsStatus === 'idle' || dsStatus === 'pending' || dsStatus === 'running');
-    const isLicLoading = !!licensesTaskId && (licStatus === 'idle' || licStatus === 'pending' || licStatus === 'running');
 
 
     return (
@@ -315,7 +315,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <div className="bg-[#1A365D]/5 p-3 rounded-xl border border-[#1A365D]/10">
                                     <h4 className="text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest mb-2 opacity-70">DATASETS:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {(isDsRequesting || dsStatus === 'running' || dsStatus === 'pending' || datasetsTaskId) ? (
+                                        {isDsLoading ? (
                                             <li className="text-[#1A365D]/60 italic flex items-center gap-2 animate-pulse">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                                 Analyzing paper for datasets...
@@ -342,7 +342,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <div className="bg-[#D4AF37]/5 p-3 rounded-xl border border-[#D4AF37]/20">
                                     <h4 className="text-[10px] font-extrabold text-[#D4AF37] uppercase tracking-widest mb-2 opacity-70">LICENSES:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {(isLicRequesting || licStatus === 'running' || licStatus === 'pending' || licensesTaskId) ? (
+                                        {isLicLoading ? (
                                             <li className="text-[#D4AF37]/60 italic flex items-center gap-2 animate-pulse">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                                 Scanning for content licenses...
