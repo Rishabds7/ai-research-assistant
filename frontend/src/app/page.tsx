@@ -202,6 +202,8 @@ export default function Home() {
               </Button>
             </form>
 
+            <div className="text-[#1A365D]/30 font-bold text-[10px] tracking-widest px-2">OR</div>
+
             {papers.length > 0 && (
               <Button
                 variant="ghost"
