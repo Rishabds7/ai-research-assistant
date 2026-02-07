@@ -228,7 +228,8 @@ def _extract_license_snippets(text: str) -> list[str]:
         r"permission granted", r"©",
         r"distribution", r"terms of use", r"proprietary",
         r"github\.com", r"open source", r"available at", r"under the terms",
-        r"repository", r"software license"
+        r"repository", r"software license", r"CC[- ]?BY", r"CC[- ]?0",
+        r"MIT License", r"Apache 2", r"GNU", r"GPL", r"public domain"
     ]
     
     combined_pattern = "|".join(keywords)
@@ -243,11 +244,21 @@ def _extract_license_snippets(text: str) -> list[str]:
         f"[END OF PAPER] {tail_text}"
     ]
     
+    # Strategic Context: Include area around Keywords like Acknowledgments (where licenses hide)
+    structure_keywords = ["acknowledgments", "acknowledgements", "appendix", "appendices", "code availability", "data availability"]
+    for sk in structure_keywords:
+        m = re.search(rf"\b{sk}\b", text, re.IGNORECASE)
+        if m:
+            start = max(0, m.start() - 500)
+            end = min(len(text), m.end() + 2500)
+            section_text = text[start:end].replace('\n', ' ')
+            snippets.append(f"[STRUCTURAL SECTION: {sk.upper()}] {section_text}")
+
     if not matches:
-        return snippets
+        return snippets[:35]
         
     # Increased context size to capture headers and citations
-    CONTEXT_SIZE = 800
+    CONTEXT_SIZE = 1200
     
     # Merge overlapping ranges
     ranges = []
@@ -270,9 +281,10 @@ def _extract_license_snippets(text: str) -> list[str]:
     
     for start, end in merged:
         snippet = text[start:end].replace("\n", " ").strip()
-        snippets.append(snippet)
+        if snippet not in snippets:
+            snippets.append(snippet)
         
-    return snippets[:25]
+    return snippets[:40]
 
 
 def _extract_dataset_snippets(text: str) -> list[str]:
@@ -407,17 +419,19 @@ Snippets:
         # 2. Optimization: Return empty if no keywords found
         # 3. LLM Call with pure evidence
         snippets_text = "\n---\n".join(snippets)
-        prompt = f"""You are a professional research librarian and copyright expert. Analyze these snippets from a research paper and identify the EXACT software, data, or content licenses mentioned.
+        prompt = f"""You are a professional research librarian and license compliance expert. 
+Your goal is to identify ALL licenses mentioned in the research paper—for the paper itself, the code, the models, or the datasets used.
 
 Rules:
-1. Return a JSON LIST of strings: ["License Name 1", "License Name 2"]
-2. LOOK AGGRESSIVELY for: MIT, Apache 2.0, Creative Commons (CC BY, CC0, CC BY-SA, CC BY-NC), GPL, BSD, etc.
-3. Check specifically for citations like "Reproduced with permission from [Source]" or software snippets.
-4. If a license applies to a specific dataset or tool used, include it.
-5. If NO explicit license is stated anywhere in the evidence, return ["None mentioned"].
-6. Deduplicate and normalize names (e.g., use "CC BY 4.0" instead of just "Creative Commons").
+1. Return ONLY a JSON LIST of strings: ["MIT License", "CC BY 4.0", ...]
+2. LOOK AGGRESSIVELY: Often licenses are in footnotes, acknowledgments, or figures.
+3. Check for dataset-specific licenses (e.g., "COCO is under CC BY 4.0", "ImageNet is for non-commercial use").
+4. If a repository link is provided (e.g., GitHub), and it mentions a license, include it.
+5. Search for phrases like "reproduced with permission", "available under the terms of", "licensed for".
+6. If absolutely NO explicit license or usage terms are found, return ["None mentioned"].
+7. Deduplicate and use standard names (e.g. "Apache 2.0", "GPLv3").
 
-Snippets:
+Snippets from Paper:
 {snippets_text}
 
 Return ONLY a JSON list of strings."""
