@@ -215,54 +215,56 @@ def _extract_license_snippets(text: str) -> list[str]:
     Heuristic snippet finder to locate license/copyright info across the WHOLE paper.
     Returns a list of relevant text chunks with context.
     """
-    # Expanded Keywords and Patterns for stronger detection
-    keywords = [
-        r"licensed? under", r"copyright", r"permission", 
-        r"creative commons", r"creativecommons\.org", 
-        r"CC[- ]?BY", r"CC[- ]?0", r"CC[- ]?SA", r"CC[- ]?NC",
-        r"MIT license", r"Apache[- ]?2\.0", r"GPL", r"BSD", r"MPL", r"LGPL", r"AGPL",
-        r"code availability", r"data availability",
-        r"acknowledgments", r"funding",
-        r"figure", r"fig\.", r"caption", 
-        r"reproduced from", r"adapted from", 
-        r"permission granted", r"©",
-        r"distribution", r"terms of use", r"proprietary",
-        r"github\.com", r"open source", r"available at", r"under the terms",
-        r"repository", r"software license", r"CC[- ]?BY", r"CC[- ]?0",
-        r"MIT License", r"Apache 2", r"GNU", r"GPL", r"public domain"
+    # Strong License Keywords (High signal)
+    strong_keywords = [
+        r"creative commons", r"creativecommons\.org", r"CC[- ]?BY", r"CC[- ]?0", r"CC[- ]?SA", r"CC[- ]?NC",
+        r"MIT license", r"Apache 2", r"GNU", r"GPL", r"BSD", r"Public Domain", r"CC BY",
+        r"proprietary", r"all rights reserved", r"©", r"copyright"
     ]
     
-    combined_pattern = "|".join(keywords)
+    # Potential Context Keywords (Lower signal, need near stronger words)
+    context_keywords = [
+        r"licensed? under", r"permission", r"reproduced from", r"adapted from",
+        r"figure caption", r"fig\.", r"caption", r"acknowledgments",
+        r"terms of use", r"code availability", r"data availability",
+        r"github\.com", r"available at", r"source code", r"repository"
+    ]
+    
+    all_keywords = strong_keywords + context_keywords
+    combined_pattern = "|".join(all_keywords)
     matches = list(re.finditer(combined_pattern, text, re.IGNORECASE))
     
-    head_text = text[:5000].replace('\n', ' ')
-    tail_text = text[-5000:].replace('\n', ' ')
+    head_text = text[:8000].replace('\n', ' ')
+    tail_text = text[-8000:].replace('\n', ' ')
     
-    # Always include the head and tail of the paper (highest density for metadata/acknowledgments)
+    # Always include the head and tail of the paper
     snippets = [
-        f"[BEGINNING OF PAPER] {head_text}",
-        f"[END OF PAPER] {tail_text}"
+        f"[HEAD] {head_text}",
+        f"[TAIL] {tail_text}"
     ]
     
-    # Strategic Context: Include area around Keywords like Acknowledgments (where licenses hide)
-    structure_keywords = ["acknowledgments", "acknowledgements", "appendix", "appendices", "code availability", "data availability"]
+    # Strategic Section Search
+    structure_keywords = ["acknowledgments", "appendix", "data availability", "code availability", "software availability"]
     for sk in structure_keywords:
         m = re.search(rf"\b{sk}\b", text, re.IGNORECASE)
         if m:
             start = max(0, m.start() - 500)
-            end = min(len(text), m.end() + 2500)
+            end = min(len(text), m.end() + 3000)
             section_text = text[start:end].replace('\n', ' ')
-            snippets.append(f"[STRUCTURAL SECTION: {sk.upper()}] {section_text}")
+            snippets.append(f"[SECTION: {sk.upper()}] {section_text}")
 
     if not matches:
-        return snippets[:35]
+        return snippets[:40]
         
-    # Increased context size to capture headers and citations
-    CONTEXT_SIZE = 1200
+    CONTEXT_SIZE = 1500 # Even larger context
     
-    # Merge overlapping ranges
     ranges = []
     for m in matches:
+        # Prioritize matches that are likely to be headers or captions
+        is_strong = any(re.search(sk, m.group(0), re.IGNORECASE) for sk in strong_keywords)
+        
+        # If it's a weak match like "figure", only include if it's near another keyword
+        # or just include it with a wider window to be safe.
         start = max(0, m.start() - CONTEXT_SIZE)
         end = min(len(text), m.end() + CONTEXT_SIZE)
         ranges.append((start, end))
@@ -272,7 +274,7 @@ def _extract_license_snippets(text: str) -> list[str]:
     if ranges:
         curr_start, curr_end = ranges[0]
         for start, end in ranges[1:]:
-            if start < curr_end:  # Overlap
+            if start < curr_end:
                 curr_end = max(curr_end, end)
             else:
                 merged.append((curr_start, curr_end))
@@ -281,10 +283,11 @@ def _extract_license_snippets(text: str) -> list[str]:
     
     for start, end in merged:
         snippet = text[start:end].replace("\n", " ").strip()
-        if snippet not in snippets:
+        # Deduplication check
+        if not any(snippet[:100] in s for s in snippets):
             snippets.append(snippet)
         
-    return snippets[:40]
+    return snippets[:100] # Increase limit to 100 to ensure "whole paper" is covered
 
 
 def _extract_dataset_snippets(text: str) -> list[str]:
@@ -424,10 +427,10 @@ Your goal is to identify ALL licenses mentioned in the research paper—for the 
 
 Rules:
 1. Return ONLY a JSON LIST of strings: ["MIT License", "CC BY 4.0", ...]
-2. LOOK AGGRESSIVELY: Often licenses are in footnotes, acknowledgments, or figures.
+2. LOOK AGGRESSIVELY: Often licenses are in footnotes, acknowledgments, or FIGURE CAPTIONS.
 3. Check for dataset-specific licenses (e.g., "COCO is under CC BY 4.0", "ImageNet is for non-commercial use").
 4. If a repository link is provided (e.g., GitHub), and it mentions a license, include it.
-5. Search for phrases like "reproduced with permission", "available under the terms of", "licensed for".
+5. Search for phrases like "reproduced with permission", "available under the terms of", "licensed for", "Source: [X]".
 6. If absolutely NO explicit license or usage terms are found, return ["None mentioned"].
 7. Deduplicate and use standard names (e.g. "Apache 2.0", "GPLv3").
 
