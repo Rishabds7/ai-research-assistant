@@ -475,30 +475,53 @@ Return ONLY JSON."""
             
             if mapped_content:
                 mapped_sections[standard_section] = '\n\n'.join(mapped_content)
+        
+        # SMART FALLBACKS: Ensure no section is left entirely empty if full_text is available
+        if full_text:
+            if not mapped_sections.get('Abstract') or len(mapped_sections['Abstract']) < 100:
+                mapped_sections['Abstract'] = full_text[:8000]
 
-        # SMART FALLBACKS:
-        if (not mapped_sections.get('Abstract') or len(mapped_sections['Abstract']) < 100) and full_text:
-            mapped_sections['Abstract'] = full_text[:8000]
+            if not mapped_sections.get('Introduction') or len(mapped_sections['Introduction']) < 100:
+                mapped_sections['Introduction'] = full_text[2000:15000]
 
-        if (not mapped_sections.get('Introduction') or len(mapped_sections['Introduction']) < 100) and full_text:
-            # Avoid repeating the abstract exactly, take a chunk that usually contains the Intro
-            mapped_sections['Introduction'] = full_text[3000:15000]
+            if not mapped_sections.get('Background') or len(mapped_sections['Background']) < 100:
+                # Background usually follows intro
+                start = int(len(full_text) * 0.1)
+                end = int(len(full_text) * 0.3)
+                mapped_sections['Background'] = full_text[start:end]
 
-        if (not mapped_sections.get('Conclusion') or len(mapped_sections['Conclusion']) < 100) and full_text:
-            mapped_sections['Conclusion'] = full_text[-10000:]
+            if not mapped_sections.get('Methodology') or len(mapped_sections['Methodology']) < 100:
+                start = int(len(full_text) * 0.25)
+                end = int(len(full_text) * 0.55)
+                mapped_sections['Methodology'] = full_text[start:end]
+
+            if not mapped_sections.get('Experiments') or len(mapped_sections['Experiments']) < 100:
+                start = int(len(full_text) * 0.45)
+                end = int(len(full_text) * 0.75)
+                mapped_sections['Experiments'] = full_text[start:end]
+
+            if not mapped_sections.get('Results') or len(mapped_sections['Results']) < 100:
+                start = int(len(full_text) * 0.65)
+                end = int(len(full_text) * 0.9)
+                mapped_sections['Results'] = full_text[start:end]
+
+            if not mapped_sections.get('Conclusion') or len(mapped_sections['Conclusion']) < 100:
+                mapped_sections['Conclusion'] = full_text[-12000:]
         
         # Generate summaries for each standard section
         summaries = {}
-        for section_name, content in mapped_sections.items():
+        # Iterate through STANDARD_SECTIONS to maintain order and ensure we check all
+        for section_name in STANDARD_SECTIONS:
+            content = mapped_sections.get(section_name)
             if not content or len(content.strip()) < 50:
                 continue
                 
-            prompt = f"""You are analyzing a research paper. Please provide a high-density executive summary of the "{section_name}" section.
+            prompt = f"""You are a senior research analyst. Provide a high-density executive summary of the "{section_name}" section.
 
 CONSTRAINTS:
-1. Provide 6-8 comprehensive bullet points.
-2. Each point must be a single, long-form continuous line (no internal line breaks or wrapping).
-3. Focus on specific technical details, findings, or claims.
+1. Provide 6-8 comprehensive, technical bullet points.
+2. Each point must be a single, long-form continuous line (no internal line breaks).
+3. Be specific: include names of models, datasets, or numerical results if present.
 4. DO NOT use symbols like - or * or • to start the lines.
 5. Provide ONLY the points, one per line. No intro/outro text.
 

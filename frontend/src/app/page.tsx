@@ -27,7 +27,25 @@ export default function Home() {
   const fetchPapers = async () => {
     try {
       const data = await getPapers();
-      setPapers(data);
+      setPapers(prev => {
+        // 1. Identify existing optimistic placeholders
+        const placeholders = prev.filter(p => p.id.toString().startsWith('temp-'));
+
+        // 2. Filter out placeholders that have already been uploaded (matched by filename)
+        const activePlaceholders = placeholders.filter(ph =>
+          !data.some((d: Paper) => d.filename === ph.filename)
+        );
+
+        // 3. Combine and sort
+        const combined = [...activePlaceholders, ...data];
+
+        // Sort: Real papers by uploaded_at, Placeholders at the very top.
+        return combined.sort((a, b) => {
+          if (a.id.toString().startsWith('temp-')) return -1;
+          if (b.id.toString().startsWith('temp-')) return 1;
+          return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime();
+        });
+      });
     } catch (e) {
       console.error("Failed to fetch papers", e);
     }
