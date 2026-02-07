@@ -234,10 +234,13 @@ def _extract_license_snippets(text: str) -> list[str]:
     combined_pattern = "|".join(keywords)
     matches = list(re.finditer(combined_pattern, text, re.IGNORECASE))
     
+    head_text = text[:5000].replace('\n', ' ')
+    tail_text = text[-5000:].replace('\n', ' ')
+    
     # Always include the head and tail of the paper (highest density for metadata/acknowledgments)
     snippets = [
-        f"[BEGINNING OF PAPER] {text[:5000].replace('\n', ' ')}",
-        f"[END OF PAPER] {text[-5000:].replace('\n', ' ')}"
+        f"[BEGINNING OF PAPER] {head_text}",
+        f"[END OF PAPER] {tail_text}"
     ]
     
     if not matches:
