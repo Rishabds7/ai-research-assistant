@@ -55,6 +55,7 @@ class EmbeddingService:
                 genai.embed_content(model=model, content=test_text, task_type="retrieval_document")
                 self.model_name = model
                 self._model_confirmed = True
+                logger.info(f"EMBEDDING: Confirmed working model: {model}")
                 return
             except Exception:
                 continue

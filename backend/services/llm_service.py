@@ -351,6 +351,7 @@ class GeminiLLMService:
             model_name=GEMINI_MODEL,
             generation_config={"temperature": 0.1}
         )
+        logger.info(f"LLM: Initialized Gemini service with model {GEMINI_MODEL}")
 
     def _generate(self, prompt: str) -> str:
         """
@@ -657,6 +658,7 @@ class OllamaLLMService:
     def __init__(self) -> None:
         self.host = OLLAMA_HOST.rstrip("/")
         self.model = OLLAMA_MODEL
+        logger.info(f"LLM: Initialized Ollama service at {self.host} with model {self.model}")
 
     def _generate(self, prompt: str, system: str = "") -> str:
         """
