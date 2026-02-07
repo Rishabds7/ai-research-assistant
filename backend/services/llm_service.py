@@ -159,21 +159,36 @@ def clean_llm_summary(text: str) -> str:
         r"^overall,"
     ]
     
+    # Pre-clean the list: merge lines that clearly look like continuations of the same point
+    merged_lines = []
     for line in lines:
+        cleaned = line.strip()
+        if not cleaned: continue
+        
+        # Strip bullets from this specific line for checking
+        content = re.sub(r"^[ \t]*([•\-*–—\d\.]+[ \t]*)+", "", cleaned).strip()
+        if not content: continue
+        
+        if merged_lines:
+            last = merged_lines[-1]
+            # If last ends with a hyphen or NO punctuation, and current starts with lowercase or is short
+            # Logic: If it looks like a break
+            if (last.endswith('-') or not re.search(r'[.!?]$', last)) and (content[0].islower() or len(content) < 40):
+                if last.endswith('-'):
+                    merged_lines[-1] = last[:-1] + content
+                else:
+                    merged_lines[-1] = last + " " + content
+                continue
+        
+        merged_lines.append(cleaned)
+    
+    for line in merged_lines:
         cleaned_line = line.strip()
         
         # Skip empty lines
         if not cleaned_line:
             continue
             
-        # Remove standard meta-note suffixes
-        if "Note:" in cleaned_line:
-            parts = cleaned_line.split("Note:", 1)
-            if parts[0].strip() and len(parts[0].strip()) > 10:
-                cleaned_line = parts[0].strip()
-            else:
-                continue
-        
         # Check if line is meta-text
         is_meta = False
         stripped_lower = cleaned_line.lower()
@@ -182,12 +197,12 @@ def clean_llm_summary(text: str) -> str:
                 is_meta = True
                 break
         
-        if is_meta or len(cleaned_line) < 3:
+        if is_meta:
             continue
 
         # STRIP LEADING BULLETS/NUMBERS (keeping only the content)
         content = re.sub(r"^[ \t]*([•\-*–—\d\.]+[ \t]*)+", "", cleaned_line).strip()
-        if not content or len(content) < 5:
+        if not content:
             continue
 
         processed_points.append(content)
@@ -416,6 +431,26 @@ Return ONLY JSON."""
                     
         return licenses
 
+    def _pre_clean_content(self, text: str) -> str:
+        """
+        Fixes PDF extraction artifacts like mid-word hyphens and unnecessary line breaks
+        before sending to the LLM.
+        """
+        if not text: return ""
+        # 1. Join words broken by hyphens at end of lines
+        text = re.sub(r'(\w)-\n\s*(\w)', r'\1\2', text)
+        # 2. Join lines that don't end in punctuation
+        lines = text.split('\n')
+        processed = []
+        for line in lines:
+            line = line.strip()
+            if not line: continue
+            if processed and not re.search(r'[.!?]$', processed[-1]):
+                processed[-1] = processed[-1] + " " + line
+            else:
+                processed.append(line)
+        return "\n".join(processed)
+
     def summarize_sections(self, sections: dict[str, str], full_text: str = "") -> dict[str, str]:
         """
         Maps paper sections to standardized academic sections and creates summaries.
@@ -502,13 +537,13 @@ Return ONLY JSON."""
 CONSTRAINTS:
 1. Provide exactly 6-8 comprehensive bullet points. 
 2. Each point MUST start with a '-' symbol.
-3. Each point MUST be a single, long-form continuous line (no internal line breaks or wrapping).
-4. NO introductory text, NO "Here is a summary", NO "The paper discusses".
-5. Focus on specific technical details: architecture names, dataset sizes, specific metrics (p-values, accuracy %, etc.), and novel claims.
-6. For Abstract and Results, ensure extremely high technical density.
+3. Each point MUST be a complete, self-contained technical insight (do not split one sentence into two points).
+4. Each point MUST be a single, long-form continuous line.
+5. NO introductory text, NO meta-commentary.
+6. MANDATORY: Fix any broken words or line-breaks from the source text. 
 
 Content to summarize:
-{content[:15000]}"""
+{self._pre_clean_content(content)[:15000]}"""
             
             raw_summary = self._generate(prompt)
             summaries[section_name] = clean_llm_summary(raw_summary)
