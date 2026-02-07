@@ -33,6 +33,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [showLicenses, setShowLicenses] = useState(
         !!(paper.task_ids?.licenses || (paper.metadata?.licenses && paper.metadata.licenses.length > 0))
     );
+    const [isDsRequesting, setIsDsRequesting] = useState(false);
+    const [isLicRequesting, setIsLicRequesting] = useState(false);
 
     // Sync task IDs from paper.task_ids if they become available or update
     useEffect(() => {
@@ -72,12 +74,14 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const { status: dsStatus } = useTaskPoll(datasetsTaskId, () => {
         onUpdate();
         setDatasetsTaskId(null);
+        setIsDsRequesting(false);
     });
 
     // Poll for licenses
     const { status: licStatus } = useTaskPoll(licensesTaskId, () => {
         onUpdate();
         setLicensesTaskId(null);
+        setIsLicRequesting(false);
     });
 
     const handleSummarize = async () => {
@@ -93,18 +97,29 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     };
 
     const handleExtractMetadata = async (field: 'datasets' | 'licenses') => {
-        if (field === 'datasets') setShowDatasets(true);
-        else setShowLicenses(true);
+        if (field === 'datasets') {
+            setShowDatasets(true);
+            setIsDsRequesting(true);
+        } else {
+            setShowLicenses(true);
+            setIsLicRequesting(true);
+        }
 
         try {
             const data = await extractMetadata(paper.id, field);
-            if (!data?.task_id) throw new Error("No task ID returned");
+            if (!data?.task_id) {
+                if (field === 'datasets') setIsDsRequesting(false);
+                else setIsLicRequesting(false);
+                throw new Error("No task ID returned");
+            }
             if (field === 'datasets') setDatasetsTaskId(data.task_id);
             else setLicensesTaskId(data.task_id);
             // Update parent state so task_id is persisted if we switch tabs
             onUpdate();
         } catch (e) {
             console.error(e);
+            if (field === 'datasets') setIsDsRequesting(false);
+            else setIsLicRequesting(false);
             alert(`Failed to extract ${field}`);
         }
     };
@@ -300,7 +315,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <div className="bg-[#1A365D]/5 p-3 rounded-xl border border-[#1A365D]/10">
                                     <h4 className="text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest mb-2 opacity-70">DATASETS:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {(dsStatus === 'running' || dsStatus === 'pending' || datasetsTaskId) ? (
+                                        {(isDsRequesting || dsStatus === 'running' || dsStatus === 'pending' || datasetsTaskId) ? (
                                             <li className="text-[#1A365D]/60 italic flex items-center gap-2 animate-pulse">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                                 Analyzing paper for datasets...
@@ -327,7 +342,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <div className="bg-[#D4AF37]/5 p-3 rounded-xl border border-[#D4AF37]/20">
                                     <h4 className="text-[10px] font-extrabold text-[#D4AF37] uppercase tracking-widest mb-2 opacity-70">LICENSES:</h4>
                                     <ul className="text-xs space-y-1.5">
-                                        {(licStatus === 'running' || licStatus === 'pending' || licensesTaskId) ? (
+                                        {(isLicRequesting || licStatus === 'running' || licStatus === 'pending' || licensesTaskId) ? (
                                             <li className="text-[#D4AF37]/60 italic flex items-center gap-2 animate-pulse">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                                 Scanning for content licenses...

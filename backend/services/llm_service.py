@@ -227,7 +227,9 @@ def _extract_license_snippets(text: str) -> list[str]:
         r"licensed? under", r"permission", r"reproduced from", r"adapted from",
         r"figure caption", r"fig\.", r"caption", r"acknowledgments",
         r"terms of use", r"code availability", r"data availability",
-        r"github\.com", r"available at", r"source code", r"repository"
+        r"github\.com", r"available at", r"source code", r"repository",
+        r"non-commercial", r"commercial use", r"academic use", r"restricted use",
+        r"usage terms", r"terms of service", r"redistribution", r"citation policy"
     ]
     
     all_keywords = strong_keywords + context_keywords
@@ -422,17 +424,16 @@ Snippets:
         # 2. Optimization: Return empty if no keywords found
         # 3. LLM Call with pure evidence
         snippets_text = "\n---\n".join(snippets)
-        prompt = f"""You are a professional research librarian and license compliance expert. 
-Your goal is to identify ALL licenses mentioned in the research paper—for the paper itself, the code, the models, or the datasets used.
+        prompt = f"""You are a professional research librarian and license compliance auditor. 
+Your goal is to identify ALL licenses and usage terms mentioned in the research paper. This includes licenses for the paper itself, the source code, any models released, AND the datasets used or introduced.
 
 Rules:
 1. Return ONLY a JSON LIST of strings: ["MIT License", "CC BY 4.0", ...]
-2. LOOK AGGRESSIVELY: Often licenses are in footnotes, acknowledgments, or FIGURE CAPTIONS.
-3. Check for dataset-specific licenses (e.g., "COCO is under CC BY 4.0", "ImageNet is for non-commercial use").
-4. If a repository link is provided (e.g., GitHub), and it mentions a license, include it.
-5. Search for phrases like "reproduced with permission", "available under the terms of", "licensed for", "Source: [X]".
-6. If absolutely NO explicit license or usage terms are found, return ["None mentioned"].
-7. Deduplicate and use standard names (e.g. "Apache 2.0", "GPLv3").
+2. LOOK AGGRESSIVELY: Often licenses are in footnotes, acknowledgments, Figure Captions, or "Data availability" sections.
+3. Check for specific usage restrictions (e.g., "available for non-commercial research", "distributed under a restricted license").
+4. If a repository or project website is mentioned, check if a license is specified for it.
+5. If NO explicit license or clear usage terms are found in the evidence, return ["None mentioned"].
+6. Deduplicate entries and normalize to standard names.
 
 Snippets from Paper:
 {snippets_text}
