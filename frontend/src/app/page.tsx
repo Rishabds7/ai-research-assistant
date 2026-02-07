@@ -159,34 +159,34 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex justify-between items-center bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-[#F1E9D2] shadow-sm">
+        <div className="flex justify-between items-center bg-white/70 backdrop-blur-md p-6 rounded-3xl border border-[#F1E9D2] shadow-xl shadow-blue-900/5 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-900/10">
           <div className="flex items-center gap-6">
             <div className="relative group">
-              <div className="absolute -inset-1 bg-linear-to-r from-[#D4AF37] to-[#1A365D] rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              <div className="absolute -inset-2 bg-linear-to-r from-[#D4AF37] to-[#1A365D] rounded-2xl blur-md opacity-20 group-hover:opacity-40 transition duration-1000"></div>
               <img
                 src="/logo.png"
                 alt="PaperDigest AI Logo"
                 className="relative h-16 w-16 object-contain logo-animate logo-glow rounded-xl"
               />
             </div>
-            <div>
+            <div className="space-y-0.5">
               <h1 className="text-4xl font-extrabold tracking-tight text-[#1A365D]">
                 PaperDigest <span className="text-[#D4AF37]">AI</span>
               </h1>
-              <p className="text-slate-500 font-medium tracking-wide">
-                Transform research paper into actionable insights
+              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em] opacity-80">
+                AI-Powered Research Intelligence
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <form onSubmit={handleArxivSubmit} className="flex items-center bg-white border border-[#F1E9D2] p-1 rounded-xl shadow-inner-sm mr-2 overflow-hidden">
-              <div className="flex items-center gap-2 px-3 text-slate-400">
+          <div className="flex items-center gap-4">
+            <form onSubmit={handleArxivSubmit} className="flex items-center bg-white border border-[#F1E9D2] p-1.5 rounded-2xl shadow-inner-sm mr-2 transition-all focus-within:ring-2 focus-within:ring-[#D4AF37]/20 group/arxiv">
+              <div className="flex items-center gap-2 px-3 text-slate-400 group-focus-within/arxiv:text-[#D4AF37] transition-colors">
                 <Link className="h-4 w-4" />
               </div>
               <Input
-                placeholder="ArXiv URL or ID (e.g. 2303.12345)"
-                className="border-none bg-transparent focus-visible:ring-0 w-48 text-sm"
+                placeholder="ArXiv URL or ID..."
+                className="border-none bg-transparent focus-visible:ring-0 w-44 text-sm font-medium"
                 value={arxivUrl}
                 onChange={(e) => setArxivUrl(e.target.value)}
                 disabled={isIngesting}
@@ -195,14 +195,14 @@ export default function Home() {
                 type="submit"
                 variant="ghost"
                 size="sm"
-                className="rounded-lg h-9 font-bold text-[#1A365D] hover:bg-[#F1E9D2]/30"
+                className="rounded-xl h-9 px-4 font-extrabold text-[#1A365D] hover:bg-[#D4AF37] hover:text-white transition-all active:scale-90"
                 disabled={isIngesting || !arxivUrl}
               >
                 {isIngesting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fetch"}
               </Button>
             </form>
 
-            <div className="text-[#1A365D]/30 font-bold text-[10px] tracking-widest px-2">OR</div>
+            <div className="text-[#1A365D]/20 font-black text-[9px] tracking-[0.4em]">OR</div>
 
             <input
               id="file-upload-input"
@@ -215,17 +215,17 @@ export default function Home() {
             <Button
               onClick={handleButtonClick}
               disabled={uploadingCount > 10}
-              className="bg-[#1A365D] hover:bg-[#2C5282] text-white px-6 py-6 rounded-xl shadow-lg shadow-blue-900/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="bg-[#1A365D] hover:bg-[#0F172A] text-white px-8 h-14 rounded-2xl shadow-xl shadow-[#1A365D]/20 transition-all hover:scale-[1.03] active:scale-[0.97] font-bold"
             >
               {uploadingCount > 0 ? (
                 <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  <Loader2 className="mr-3 h-5 w-5 animate-spin text-[#D4AF37]" />
                   Processing {uploadingCount}...
                 </>
               ) : (
                 <>
-                  <UploadCloud className="mr-2 h-5 w-5" />
-                  <span className="text-lg">Upload Documents</span>
+                  <UploadCloud className="mr-3 h-6 w-6" />
+                  <span className="text-base">Upload Research</span>
                 </>
               )}
             </Button>
@@ -233,19 +233,25 @@ export default function Home() {
         </div>
 
         <Tabs defaultValue="papers" className="w-full">
-          <div className="flex items-center justify-between mb-8">
-            <TabsList className="bg-[#F1E9D2]/30 p-1 rounded-xl border border-[#F1E9D2]/50">
+          <div className="flex items-center justify-between mb-8 animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <TabsList className="bg-white/40 backdrop-blur-sm p-1.5 rounded-2xl border border-[#F1E9D2]/80 shadow-sm">
               <TabsTrigger
                 value="papers"
-                className="px-8 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all font-bold"
+                className="px-10 py-3 rounded-xl data-[state=active]:bg-[#1A365D] data-[state=active]:text-white data-[state=active]:shadow-lg transition-all font-extrabold tracking-tight group"
               >
-                📄 Documents
+                <div className="flex items-center gap-2">
+                  <span className="opacity-70 group-data-[state=active]:opacity-100">📄</span>
+                  Library
+                </div>
               </TabsTrigger>
               <TabsTrigger
                 value="review"
-                className="px-8 py-3 rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1A365D] data-[state=active]:shadow-sm transition-all font-bold"
+                className="px-10 py-3 rounded-xl data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-lg transition-all font-extrabold tracking-tight group"
               >
-                📋 AI Review
+                <div className="flex items-center gap-2">
+                  <span className="opacity-70 group-data-[state=active]:opacity-100">📋</span>
+                  Literature Review
+                </div>
               </TabsTrigger>
             </TabsList>
 

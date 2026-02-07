@@ -175,28 +175,31 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
 
 
     return (
-        <Card className="mb-6 border-[#F1E9D2] shadow-sm hover:shadow-md transition-shadow rounded-2xl overflow-hidden bg-white">
-            <CardHeader className="pb-4 bg-[#FDFBF7]/50 border-b border-[#F1E9D2]/30">
+        <Card className="mb-8 border-[#F1E9D2] hover:border-[#D4AF37]/50 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl overflow-hidden bg-white group">
+            <CardHeader className="pb-6 bg-[#FDFBF7] border-b border-[#F1E9D2]/40 transition-colors group-hover:bg-[#FDFBF7]/80">
                 <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-[#1A365D]/5 p-2 rounded-lg">
-                            <FileText className="h-6 w-6 text-[#1A365D]" />
+                    <div className="flex items-center gap-5">
+                        <div className="bg-[#1A365D] p-3 rounded-xl shadow-lg shadow-blue-900/10 transform transition-transform group-hover:scale-105">
+                            <FileText className="h-6 w-6 text-white" />
                         </div>
-                        <div>
+                        <div className="space-y-1">
                             {paper.processed === false && paper.uploadTaskId === 'failed' && paper.title?.startsWith("NON-RESEARCH") ? (
-                                <div className="text-red-600 font-bold flex items-center gap-2">
-                                    <span>⚠️ Rejected: Non-Academic Content</span>
+                                <div className="text-red-600 font-extrabold flex items-center gap-2 text-sm uppercase tracking-wide">
+                                    <X className="h-4 w-4" />
+                                    <span>Rejected: Non-Academic Content</span>
                                 </div>
                             ) : (
-                                <CardTitle className="text-xl font-bold text-[#1A365D] tracking-tight">{paper.filename}</CardTitle>
+                                <CardTitle className="text-xl font-extrabold text-[#1A365D] tracking-tight leading-none group-hover:text-[#D4AF37] transition-colors">
+                                    {paper.filename}
+                                </CardTitle>
                             )}
 
                             {!paper.processed && !paper.uploadTaskId?.includes('failed') && (
-                                <div className="flex flex-col gap-2 mt-2">
-                                    <div className="flex items-center gap-2 text-[10px] text-blue-500 font-bold uppercase tracking-widest animate-pulse">
-                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                <div className="flex flex-col gap-2 mt-3">
+                                    <div className="flex items-center gap-2.5 text-[10px] text-[#1A365D]/60 font-bold uppercase tracking-[0.2em] animate-pulse">
+                                        <Loader2 className="h-3 w-3 animate-spin text-[#D4AF37]" />
                                         {processStatus === 'timeout' ? (
-                                            <span className="text-amber-500 underline decoration-dotted">Analysis delayed (Worker busy)</span>
+                                            <span className="text-amber-600">Deep Analysis delayed (Worker busy)</span>
                                         ) : (
                                             <span>Deep Analysis in Progress...</span>
                                         )}
@@ -205,7 +208,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="w-fit h-6 text-[9px] px-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                                            className="w-fit h-7 text-[10px] px-3 font-bold uppercase tracking-widest border-[#F1E9D2] text-[#1A365D] bg-white hover:bg-[#FDFBF7]"
                                             onClick={() => onUpdate()}
                                         >
                                             Refresh Status
@@ -213,7 +216,6 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                     )}
                                 </div>
                             )}
-
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -337,7 +339,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                 <div className="border-t pt-4 mt-2 space-y-4">
                     {/* Status Row */}
                     <div className="flex flex-wrap gap-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-md border border-slate-100">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100/50">
                             Status: {paper.processed ? (
                                 <span className="flex items-center gap-1 text-green-600 font-bold">
                                     <CheckCircle2 className="h-3 w-3" /> Ready
@@ -348,42 +350,44 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 </span>
                             )}
                         </div>
-                        {(isDsLoading || paper.task_ids?.datasets) && (
-                            <div className="flex items-center gap-2 px-2 py-1 bg-[#1A365D]/10 text-[#1A365D] rounded-md border border-[#1A365D]/20">
-                                <Database className="h-3 w-3" />
-                                {(!paper.metadata?.datasets?.length || paper.metadata.datasets[0] === "None mentioned") ? 0 : paper.metadata.datasets.length} Datasets
-                            </div>
-                        )}
-                        {(isLicLoading || paper.task_ids?.licenses) && (
-                            <div className="flex items-center gap-2 px-2 py-1 bg-[#D4AF37]/10 text-[#D4AF37] rounded-md border border-[#D4AF37]/20">
-                                <Award className="h-3 w-3" />
-                                {(!paper.metadata?.licenses?.length || paper.metadata.licenses[0] === "None mentioned") ? 0 : paper.metadata.licenses.length} Licenses
-                            </div>
-                        )}
+
+                        <div className="flex flex-wrap gap-3">
+                            {(isDsLoading || paper.task_ids?.datasets) && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1A365D]/5 text-[#1A365D] rounded-xl border border-[#1A365D]/10 text-[10px] font-extrabold uppercase tracking-wider">
+                                    <Database className="h-3 w-3" />
+                                    {(!paper.metadata?.datasets?.length || paper.metadata.datasets[0] === "None mentioned") ? 0 : paper.metadata.datasets.length} Datasets
+                                </div>
+                            )}
+                            {(isLicLoading || paper.task_ids?.licenses) && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#D4AF37]/10 text-[#D4AF37] rounded-xl border border-[#D4AF37]/20 text-[10px] font-extrabold uppercase tracking-wider">
+                                    <Award className="h-3 w-3" />
+                                    {(!paper.metadata?.licenses?.length || paper.metadata.licenses[0] === "None mentioned") ? 0 : paper.metadata.licenses.length} Licenses
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Metadata Results (Simple Lists) - Only show if requested or loading */}
+                    {/* Metadata Results */}
                     {(showDatasets || showLicenses) && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Datasets Box */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-1 duration-300">
                             {showDatasets && (
-                                <div className="bg-[#1A365D]/5 p-3 rounded-xl border border-[#1A365D]/10">
-                                    <h4 className="text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest mb-2 opacity-70">DATASETS:</h4>
-                                    <ul className="text-xs space-y-1.5">
+                                <div className="bg-[#1A365D]/2 p-4 rounded-2xl border border-[#1A365D]/10">
+                                    <h4 className="text-[10px] font-extrabold text-[#1A365D] uppercase tracking-[0.2em] mb-3 opacity-60">Datasets Identified</h4>
+                                    <ul className="text-xs space-y-2">
                                         {isDsLoading ? (
                                             <li className="text-[#1A365D]/60 italic flex items-center gap-2 animate-pulse">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
-                                                Analyzing paper for datasets...
+                                                Analyzing paper...
                                             </li>
                                         ) : (!paper.metadata?.datasets?.length || paper.metadata.datasets[0] === "None mentioned") ? (
-                                            <li className="text-slate-500 italic flex items-center gap-2">
+                                            <li className="text-slate-400 italic flex items-center gap-2">
                                                 <div className="h-1 w-1 bg-slate-300 rounded-full"></div>
                                                 None mentioned
                                             </li>
                                         ) : (
                                             paper.metadata.datasets.map((d: string, i: number) => (
-                                                <li key={i} className="text-slate-700 font-medium flex items-center gap-2">
-                                                    <div className="h-1 w-1 bg-[#1A365D] rounded-full"></div>
+                                                <li key={i} className="flex items-center gap-2.5 text-[#1A365D] font-bold">
+                                                    <div className="h-1.5 w-1.5 bg-[#1A365D]/40 rounded-full"></div>
                                                     {d}
                                                 </li>
                                             ))
@@ -392,25 +396,24 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 </div>
                             )}
 
-                            {/* Licenses Box */}
                             {showLicenses && (
-                                <div className="bg-[#D4AF37]/5 p-3 rounded-xl border border-[#D4AF37]/20">
-                                    <h4 className="text-[10px] font-extrabold text-[#D4AF37] uppercase tracking-widest mb-2 opacity-70">LICENSES:</h4>
-                                    <ul className="text-xs space-y-1.5">
+                                <div className="bg-[#D4AF37]/2 p-4 rounded-2xl border border-[#D4AF37]/20">
+                                    <h4 className="text-[10px] font-extrabold text-[#D4AF37] uppercase tracking-[0.2em] mb-3 opacity-60">Legal & Licensing</h4>
+                                    <ul className="text-xs space-y-2">
                                         {isLicLoading ? (
                                             <li className="text-[#D4AF37]/60 italic flex items-center gap-2 animate-pulse">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
-                                                Scanning for content licenses...
+                                                Scanning licenses...
                                             </li>
                                         ) : (!paper.metadata?.licenses?.length || paper.metadata.licenses[0] === "None mentioned") ? (
-                                            <li className="text-[#D4AF37]/60 italic flex items-center gap-2">
-                                                <div className="h-1 w-1 bg-[#D4AF37]/30 rounded-full"></div>
+                                            <li className="text-[#D4AF37]/40 italic flex items-center gap-2">
+                                                <div className="h-1 w-1 bg-[#D4AF37]/20 rounded-full"></div>
                                                 None mentioned
                                             </li>
                                         ) : (
                                             paper.metadata.licenses.map((lic: string, i: number) => (
-                                                <li key={i} className="text-slate-600 flex items-center gap-2 font-medium">
-                                                    <div className="h-1 w-1 bg-[#D4AF37] rounded-full"></div>
+                                                <li key={i} className="text-[#D4AF37] font-bold flex items-center gap-2.5">
+                                                    <div className="h-1.5 w-1.5 bg-[#D4AF37]/60 rounded-full"></div>
                                                     {lic}
                                                 </li>
                                             ))
@@ -422,45 +425,48 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     )}
 
                     {/* Title and Authors */}
-                    <div className="grid grid-cols-1 gap-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-                        <div className="space-y-1.5">
-                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">TITLE:</h4>
-                            <p className={`text-sm font-bold leading-tight ${(!paper.title || paper.title === "Unknown") ? "text-slate-400 italic font-medium" : "text-[#1A365D]"}`}>
+                    <div className="grid grid-cols-1 gap-6 bg-[#FCF9F1]/40 p-6 rounded-2xl border border-[#F1E9D2]/50 shadow-inner-sm">
+                        <div className="space-y-2">
+                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">Formal Title</h4>
+                            <div className={`text-base font-extrabold leading-tight ${(!paper.title || paper.title === "Unknown") ? "text-slate-400 italic" : "text-[#1A365D]"}`}>
                                 {!paper.processed ? (
                                     <span className="flex items-center gap-2 text-slate-400 italic font-medium">
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                         Extracting...
                                     </span>
                                 ) : (paper.title || "Not Available")}
-                            </p>
+                            </div>
                         </div>
-                        <div className="space-y-1.5 pt-3 border-t border-white shadow-[0_-1px_0_0_rgba(0,0,0,0.03)]">
-                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">AUTHORS:</h4>
-                            <p className={`text-sm leading-tight ${(!paper.authors || paper.authors === "Unknown") ? "text-slate-400 italic font-medium" : "text-slate-700 font-semibold"}`}>
+                        <div className="space-y-2 pt-4 border-t border-[#F1E9D2]/30">
+                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">Lead Authors</h4>
+                            <div className={`text-[13px] leading-snug font-medium italic ${(!paper.authors || paper.authors === "Unknown") ? "text-slate-400 italic" : "text-slate-600"}`}>
                                 {!paper.processed ? (
                                     <span className="flex items-center gap-2 text-slate-400 italic font-medium">
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                         Identifying...
                                     </span>
                                 ) : renderAuthors()}
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Section Summaries with Accordion */}
                 {paper.section_summaries && paper.section_summaries.length > 0 && (
-                    <div className="space-y-4 pt-6 border-t border-[#F1E9D2]/30 mt-4">
+                    <div className="space-y-5 pt-8 border-t border-[#F1E9D2]/40 mt-8">
                         <button
                             onClick={() => setIsSummariesVisible(!isSummariesVisible)}
-                            className="w-full flex items-center justify-between group"
+                            className="w-full flex items-center justify-between group cursor-pointer"
                         >
-                            <h4 className="text-base font-bold text-[#1A365D] flex items-center gap-2 group-hover:text-[#D4AF37] transition-colors">
-                                <List className="h-5 w-5 text-[#D4AF37]" /> Deep Section Analysis
+                            <h4 className="text-lg font-extrabold text-[#1A365D] flex items-center gap-3 active:scale-95 transition-all">
+                                <div className="p-1.5 bg-[#D4AF37]/10 rounded-lg group-hover:bg-[#1A365D] transition-colors">
+                                    <List className="h-4 w-4 text-[#D4AF37] group-hover:text-white" />
+                                </div>
+                                Deep Section Analysis
                             </h4>
-                            <div className="flex items-center gap-2 text-xs text-slate-400 font-bold uppercase tracking-tight">
-                                {isSummariesVisible ? 'Collapse' : `Expand (${paper.section_summaries.length})`}
-                                {isSummariesVisible ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            <div className="flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-widest text-[#D4AF37] bg-[#D4AF37]/5 px-3 py-1.5 rounded-lg border border-[#D4AF37]/10 group-hover:bg-[#D4AF37] group-hover:text-white transition-all">
+                                {isSummariesVisible ? 'Collapse' : `View Sections (${paper.section_summaries.length})`}
+                                <ChevronDown className={`h-3 w-3 transition-transform duration-300 ${isSummariesVisible ? 'rotate-180' : ''}`} />
                             </div>
                         </button>
 
@@ -471,30 +477,33 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                     .map(s => {
                                         const isExpanded = expandedSections[s.section_name] || false;
                                         return (
-                                            <div key={s.id} className={`border rounded-xl overflow-hidden transition-all ${isExpanded ? "border-[#D4AF37]/30 shadow-sm" : "border-slate-100"}`}>
+                                            <div
+                                                key={s.id}
+                                                className={`rounded-2xl border transition-all duration-300 overflow-hidden ${isExpanded ? "border-[#D4AF37] shadow-md ring-1 ring-[#D4AF37]/10" : "border-[#F1E9D2]/60 hover:border-[#D4AF37]/50"}`}
+                                            >
                                                 <button
                                                     onClick={() => toggleSection(s.section_name)}
-                                                    className={`w-full flex items-center justify-between p-4 text-left transition-colors ${isExpanded ? "bg-[#D4AF37]/5" : "bg-white hover:bg-slate-50"}`}
+                                                    className={`w-full flex items-center justify-between px-6 py-5 text-left transition-colors ${isExpanded ? "bg-[#FDFBF7]" : "bg-white hover:bg-[#FDFBF7]/30"}`}
                                                 >
-                                                    <span className={`text-sm font-bold capitalize ${isExpanded ? "text-[#1A365D]" : "text-slate-600"}`}>
+                                                    <span className={`text-sm font-extrabold tracking-tight capitalize ${isExpanded ? "text-[#D4AF37]" : "text-[#1A365D]"}`}>
                                                         {s.section_name}
                                                     </span>
-                                                    {isExpanded ? <ChevronDown className="h-4 w-4 text-[#D4AF37]" /> : <ChevronRight className="h-4 w-4 text-slate-300" />}
+                                                    <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "rotate-180 text-[#D4AF37]" : "text-slate-300"}`} />
                                                 </button>
                                                 {isExpanded && (
-                                                    <div className="p-4 bg-white border-t border-[#D4AF37]/10">
-                                                        <ul className="space-y-3">
+                                                    <div className="px-10 py-8 bg-[#FCF9F1]/30 border-t border-[#F1E9D2]/50">
+                                                        <ul className="space-y-6">
                                                             {s.summary.split(/\r?\n/).filter(Boolean).map((line, i) => {
-                                                                // Aggressive symbol stripping and header filtering
                                                                 const cleanPoint = line.replace(/^[ \t]*([•\-*–—\d\.]+[ \t]*)+/, '').trim();
                                                                 if (!cleanPoint || cleanPoint.length < 4) return null;
-                                                                // Filter out headers that might have slipped through
                                                                 if (cleanPoint.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return null;
 
                                                                 return (
-                                                                    <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed">
-                                                                        <span className="text-[#D4AF37] shrink-0 font-bold mt-0.5">◇</span>
-                                                                        <span>{cleanPoint.replace(/\s+/g, ' ')}</span>
+                                                                    <li key={i} className="flex gap-4 text-[13px] text-slate-700 leading-relaxed group">
+                                                                        <div className="mt-1.5 shrink-0">
+                                                                            <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
+                                                                        </div>
+                                                                        <span className="group-hover:text-black transition-colors">{cleanPoint.replace(/\s+/g, ' ')}</span>
                                                                     </li>
                                                                 );
                                                             })}

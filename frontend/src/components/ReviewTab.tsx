@@ -157,7 +157,7 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                         return (
                             <div
                                 key={paper.id}
-                                className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden shadow-sm ${isExpanded ? 'border-[#D4AF37] ring-1 ring-[#D4AF37]/20' : 'border-[#F1E9D2] hover:border-[#D4AF37]/50'}`}
+                                className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden shadow-sm ${isExpanded ? 'border-[#D4AF37] ring-1 ring-[#D4AF37]/20' : 'border-[#F1E9D2] hover:border-[#D4AF37]/50 hover:shadow-md'}`}
                             >
                                 {/* Collapsed Row / Trigger */}
                                 <div
