@@ -58,10 +58,11 @@ def update_task_status(task_id, status, result=None, error=None):
     except Exception as e:
         logger.error(f"Failed to update task status {task_id}: {e}")
 
-@shared_task(bind=True)
+@shared_task(bind=True, max_retries=3, default_retry_delay=10)
 def process_pdf_task(self, paper_id):
     """
     INITIAL INGESTION PIPELINE (Stage 1).
+    Configured with retries for resilience on platforms like Render Free Tier.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
