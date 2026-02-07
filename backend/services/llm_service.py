@@ -185,29 +185,10 @@ def clean_llm_summary(text: str) -> str:
         if is_meta or len(cleaned_line) < 3:
             continue
 
-        # STRIP LEADING BULLETS/NUMBERS
+        # STRIP LEADING BULLETS/NUMBERS (keeping only the content)
         content = re.sub(r"^[ \t]*([•\-*–—\d\.]+[ \t]*)+", "", cleaned_line).strip()
-        if not content:
+        if not content or len(content) < 5:
             continue
-
-        # CONTINUATION LOGIC:
-        # If this line starts with a lowercase letter, or the previous point didn't end with punctuation,
-        # it's likely a wrapped line from the same bullet point.
-        if processed_points:
-            last_point = processed_points[-1]
-            last_char_punctuation = re.search(r'[\.\?\!]$', last_point.strip())
-            
-            # Heuristic: starts with lowercase, bracket, or doesn't follow a period
-            is_continuation = (
-                content[0].islower() or 
-                content[0] in [',', ')', ']', '}'] or
-                not last_char_punctuation or
-                last_point.lower().split()[-1] in ['the', 'and', 'of', 'with', 'for', 'to', 'in', 'on', 'by', 'at', 'is', 'are']
-            )
-            
-            if is_continuation:
-                processed_points[-1] = f"{last_point} {content}"
-                continue
 
         processed_points.append(content)
             
@@ -454,12 +435,12 @@ Return ONLY JSON."""
         # Section mapping keywords
         SECTION_MAPPING = {
             'Abstract': ['abstract', 'abstract.'],
-            'Introduction': ['introduction', 'intro', 'motivation'],
-            'Background': ['background', 'related work', 'literature review', 'prior work'],
-            'Methodology': ['methodology', 'method', 'approach', 'model', 'architecture', 'framework', 'technique', 'algorithm'],
-            'Experiments': ['experiment', 'evaluation', 'setup', 'implementation', 'analysis'],
-            'Results': ['result', 'finding', 'performance', 'discussion', 'observation'],
-            'Conclusion': ['conclusion', 'concluding', 'future work', 'limitation']
+            'Introduction': ['introduction', 'intro', 'motivation', 'problem statement'],
+            'Background': ['background', 'related work', 'literature review', 'prior work', 'preliminaries', 'context', 'motivation'],
+            'Methodology': ['methodology', 'method', 'approach', 'model', 'architecture', 'framework', 'technique', 'algorithm', 'system design'],
+            'Experiments': ['experiment', 'evaluation', 'setup', 'implementation', 'analysis', 'empirical'],
+            'Results': ['result', 'finding', 'performance', 'discussion', 'observation', 'comparison'],
+            'Conclusion': ['conclusion', 'concluding', 'future work', 'limitation', 'summary']
         }
         
         # Map paper sections to standard sections
@@ -516,16 +497,17 @@ Return ONLY JSON."""
             if not content or len(content.strip()) < 50:
                 continue
                 
-            prompt = f"""You are a senior research analyst. Provide a high-density executive summary of the "{section_name}" section.
+            prompt = f"""You are a senior research scientist. Provide a high-density, technical executive summary of the "{section_name}" section from a research paper.
 
 CONSTRAINTS:
-1. Provide 6-8 comprehensive, technical bullet points.
-2. Each point must be a single, long-form continuous line (no internal line breaks).
-3. Be specific: include names of models, datasets, or numerical results if present.
-4. DO NOT use symbols like - or * or • to start the lines.
-5. Provide ONLY the points, one per line. No intro/outro text.
+1. Provide exactly 6-8 comprehensive bullet points. 
+2. Each point MUST start with a '-' symbol.
+3. Each point MUST be a single, long-form continuous line (no internal line breaks or wrapping).
+4. NO introductory text, NO "Here is a summary", NO "The paper discusses".
+5. Focus on specific technical details: architecture names, dataset sizes, specific metrics (p-values, accuracy %, etc.), and novel claims.
+6. For Abstract and Results, ensure extremely high technical density.
 
-Content:
+Content to summarize:
 {content[:15000]}"""
             
             raw_summary = self._generate(prompt)

@@ -67,7 +67,6 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -159,7 +158,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 ]
 
 # Allow embedding PDFs in iframes
-X_FRAME_OPTIONS = 'SAMEORIGIN'
+# (Middleware removed)
 
 # Celery Configuration
 REDIS_URL = env('REDIS_URL', default='redis://redis:6379/0')

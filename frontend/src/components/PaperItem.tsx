@@ -215,10 +215,10 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                     <X className="h-4 w-4" />
                                 </Button>
                             </div>
-                            <object
-                                data={`${getMediaUrl(paper.file)}#view=FitH`}
-                                type="application/pdf"
-                                className="w-full h-[650px] border-none"
+                            <iframe
+                                src={`${getMediaUrl(paper.file)}#view=FitH`}
+                                className="w-full h-[650px] border-none shadow-2xl rounded-xl"
+                                title={`PDF viewer for ${paper.filename}`}
                             >
                                 <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 p-8 text-center">
                                     <FileText className="h-12 w-12 text-slate-300 mb-4" />
@@ -233,7 +233,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                         Open PDF in New Tab
                                     </a>
                                 </div>
-                            </object>
+                            </iframe>
                             <div className="p-2 bg-slate-900 text-white text-[10px] flex justify-between items-center px-4">
                                 <span className="flex items-center gap-2">
                                     <CheckCircle2 className="h-3 w-3 text-green-400" />
