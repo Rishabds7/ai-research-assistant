@@ -40,7 +40,13 @@ class PaperViewSet(viewsets.ModelViewSet):
         """
         Filters papers based on the 'X-Session-ID' header.
         This provides basic privacy/isolation for public demo users without full auth.
+        
+        SELF-HEALING: Automatically re-triggers processing for orphaned papers 
+        (papers that were created but never processed due to lost Celery tasks).
         """
+        from django.utils import timezone
+        from datetime import timedelta
+        
         queryset = Paper.objects.all()
         session_id = self.request.headers.get('X-Session-ID')
         
@@ -50,6 +56,30 @@ class PaperViewSet(viewsets.ModelViewSet):
             # Fallback: If no session ID, valid behavior is debatable. 
             # For this demo, let's return nothing to encourage frontend to send the ID.
             queryset = queryset.none()
+        
+        # SELF-HEALING: Find orphaned papers (unprocessed, created > 2 mins ago)
+        two_minutes_ago = timezone.now() - timedelta(minutes=2)
+        orphaned_papers = queryset.filter(
+            processed=False,
+            uploaded_at__lt=two_minutes_ago
+        )
+        
+        # Re-trigger processing for orphaned papers
+        for paper in orphaned_papers:
+            # Check if there's already a pending task for this paper
+            existing_task = TaskStatus.objects.filter(
+                result__icontains=str(paper.id),
+                status__in=['pending', 'running']
+            ).first()
+            
+            if not existing_task:
+                # Re-trigger the processing task
+                task = process_pdf_task.delay(str(paper.id))
+                TaskStatus.objects.create(
+                    task_id=task.id,
+                    task_type='process_pdf',
+                    status='pending'
+                )
             
         return queryset.order_by('-uploaded_at')
 
