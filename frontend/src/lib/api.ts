@@ -160,3 +160,52 @@ export const getBibTeX = async (id: string) => {
     const response = await api.get(`/papers/${id}/export_bibtex/`);
     return response.data; // { bibtex: ... }
 };
+
+// ===== COLLECTIONS API =====
+
+export interface Collection {
+    id: string;
+    name: string;
+    description: string;
+    paper_count?: number;
+    papers?: Paper[];
+    created_at: string;
+    updated_at: string;
+}
+
+export const getCollections = async (): Promise<Collection[]> => {
+    const response = await api.get('/collections/');
+    if (response.data && response.data.results) {
+        return response.data.results;
+    }
+    return response.data;
+};
+
+export const getCollection = async (id: string): Promise<Collection> => {
+    const response = await api.get(`/collections/${id}/`);
+    return response.data;
+};
+
+export const createCollection = async (data: { name: string; description?: string }): Promise<Collection> => {
+    const response = await api.post('/collections/', data);
+    return response.data;
+};
+
+export const updateCollection = async (id: string, data: Partial<Collection>): Promise<Collection> => {
+    const response = await api.patch(`/collections/${id}/`, data);
+    return response.data;
+};
+
+export const deleteCollection = async (id: string): Promise<void> => {
+    await api.delete(`/collections/${id}/`);
+};
+
+export const addPaperToCollection = async (collectionId: string, paperId: string) => {
+    const response = await api.post(`/collections/${collectionId}/add_paper/`, { paper_id: paperId });
+    return response.data;
+};
+
+export const removePaperFromCollection = async (collectionId: string, paperId: string) => {
+    const response = await api.post(`/collections/${collectionId}/remove_paper/`, { paper_id: paperId });
+    return response.data;
+};

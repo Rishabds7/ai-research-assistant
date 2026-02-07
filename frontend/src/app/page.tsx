@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"; // We'll use standard input for f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, UploadCloud, Trash2, Link } from "lucide-react";
 import { ReviewTab } from "@/components/ReviewTab";
+import { CollectionsTab } from '@/components/CollectionsTab';
 
 export default function Home() {
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -253,6 +254,15 @@ export default function Home() {
                   Literature Review
                 </div>
               </TabsTrigger>
+              <TabsTrigger
+                value="collections"
+                className="px-10 py-3 rounded-xl data-[state=active]:bg-[#10B981] data-[state=active]:text-white data-[state=active]:shadow-lg transition-all font-extrabold tracking-tight group"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="opacity-70 group-data-[state=active]:opacity-100">📁</span>
+                  Collections
+                </div>
+              </TabsTrigger>
             </TabsList>
 
             {papers.length > 0 && (
@@ -289,6 +299,10 @@ export default function Home() {
 
           <TabsContent value="review">
             <ReviewTab papers={papers} onUpdate={fetchPapers} />
+          </TabsContent>
+
+          <TabsContent value="collections" className="space-y-6">
+            <CollectionsTab papers={papers} onUpdate={fetchPapers} />
           </TabsContent>
         </Tabs>
       </div>

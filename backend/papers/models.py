@@ -61,6 +61,27 @@ class Paper(models.Model):
         return self.filename
 
 
+class Collection(models.Model):
+    """
+    Named collections of papers for organization.
+    Users can group papers by topic, project, or any custom criteria.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session_id = models.CharField(max_length=100, db_index=True)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    papers = models.ManyToManyField(Paper, related_name='collections', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['session_id', 'name']
+    
+    def __str__(self):
+        return f"{self.name} ({self.papers.count()} papers)"
+
+
 class Methodology(models.Model):
     """
     Detailed technical data extracted via LLM.

@@ -345,6 +345,88 @@ class TaskStatusView(views.APIView):
         serializer = TaskStatusSerializer(task)
         return Response(serializer.data)
 
+
+class CollectionViewSet(viewsets.ModelViewSet):
+    """
+    API for managing paper collections.
+    Allows users to create, update, delete collections and manage paper membership.
+    """
+    def get_queryset(self):
+        """Filter collections by session ID."""
+        from .models import Collection
+        queryset = Collection.objects.all()
+        session_id = self.request.headers.get('X-Session-ID')
+        
+        if session_id:
+            queryset = queryset.filter(session_id=session_id)
+        else:
+            queryset = queryset.none()
+        
+        return queryset.prefetch_related('papers')
+    
+    def get_serializer_class(self):
+        """Use different serializers for list vs detail views."""
+        from .serializers import CollectionListSerializer, CollectionDetailSerializer
+        if self.action == 'list':
+            return CollectionListSerializer
+        return CollectionDetailSerializer
+    
+    def perform_create(self, serializer):
+        """Automatically set session_id when creating a collection."""
+        session_id = self.request.headers.get('X-Session-ID')
+        serializer.save(session_id=session_id)
+    
+    @action(detail=True, methods=['post'])
+    def add_paper(self, request, pk=None):
+        """
+        Add a paper to this collection.
+        POST /api/collections/{id}/add_paper/
+        Body: { "paper_id": "uuid" }
+        """
+        collection = self.get_object()
+        paper_id = request.data.get('paper_id')
+        
+        if not paper_id:
+            return Response(
+                {'error': 'paper_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        paper = get_object_or_404(Paper, id=paper_id)
+        collection.papers.add(paper)
+        
+        return Response({
+            'status': 'paper added',
+            'collection_id': str(collection.id),
+            'paper_id': str(paper.id)
+        })
+    
+    @action(detail=True, methods=['post'])
+    def remove_paper(self, request, pk=None):
+        """
+        Remove a paper from this collection.
+        POST /api/collections/{id}/remove_paper/
+        Body: { "paper_id": "uuid" }
+        """
+        collection = self.get_object()
+        paper_id = request.data.get('paper_id')
+        
+        if not paper_id:
+            return Response(
+                {'error': 'paper_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        paper = get_object_or_404(Paper, id=paper_id)
+        collection.papers.remove(paper)
+        
+        return Response({
+            'status': 'paper removed',
+            'collection_id': str(collection.id),
+            'paper_id': str(paper.id)
+        })
+
+
 class PingView(views.APIView):
     def get(self, request):
         return Response({"status": "online", "message": "Backend is running!"}, status=status.HTTP_200_OK)

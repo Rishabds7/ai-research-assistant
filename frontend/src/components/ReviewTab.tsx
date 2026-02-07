@@ -1,11 +1,18 @@
 "use client";
 
-import { Paper, updatePaper } from "@/lib/api";
+import { Paper, updatePaper, Collection, getCollections } from "@/lib/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Button } from "./ui/button";
-import { Download, FileEdit, X, ChevronDown } from "lucide-react";
-import React, { useState } from "react";
+import { Download, FileEdit, X, ChevronDown, FolderOpen } from "lucide-react";
+import React, { useState, useEffect } from "react";
 import { Textarea } from "./ui/textarea";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 /**
  * AI REVIEW DASHBOARD
@@ -53,11 +60,35 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
     const [expandedPapers, setExpandedPapers] = useState<Set<string>>(new Set());
     const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
     const [notes, setNotes] = useState("");
+    const [collections, setCollections] = useState<Collection[]>([]);
+    const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
-    // Only show papers that have been summarized (Stage 2 complete)
-    const reviewedPapers = papers.filter(
+    // Fetch collections on mount
+    useEffect(() => {
+        const fetchCollections = async () => {
+            try {
+                const data = await getCollections();
+                setCollections(data);
+            } catch (error) {
+                console.error('Failed to fetch collections:', error);
+            }
+        };
+        fetchCollections();
+    }, []);
+
+    // Filter papers by selected collection
+    let reviewedPapers = papers.filter(
         (p) => (p.section_summaries && p.section_summaries.length > 0) || p.global_summary
     );
+
+    // Apply collection filter if selected
+    if (selectedCollectionId) {
+        const selectedCollection = collections.find(c => c.id === selectedCollectionId);
+        if (selectedCollection?.papers) {
+            const collectionPaperIds = new Set(selectedCollection.papers.map(p => p.id));
+            reviewedPapers = reviewedPapers.filter(p => collectionPaperIds.has(p.id));
+        }
+    }
 
     const toggleExpand = (id: string) => {
         setExpandedPapers(prev => {
@@ -122,7 +153,25 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center bg-white/50 p-6 rounded-2xl border border-[#F1E9D2] mb-8">
-                <h2 className="text-2xl font-bold text-[#1A365D]">Literature Review</h2>
+                <div className="flex items-center gap-4">
+                    <h2 className="text-2xl font-bold text-[#1A365D]">Literature Review</h2>
+                    {collections.length > 0 && (
+                        <Select value={selectedCollectionId || "all"} onValueChange={(val) => setSelectedCollectionId(val === "all" ? null : val)}>
+                            <SelectTrigger className="w-[240px] border-[#F1E9D2] bg-white hover:bg-[#FDFBF7] rounded-xl font-bold text-sm">
+                                <FolderOpen className="h-4 w-4 mr-2 text-[#D4AF37]" />
+                                <SelectValue placeholder="Filter by collection" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="font-bold">All Papers</SelectItem>
+                                {collections.map((collection) => (
+                                    <SelectItem key={collection.id} value={collection.id}>
+                                        {collection.name} ({collection.paper_count || 0})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                </div>
                 <Button
                     variant="outline"
                     onClick={downloadCSV}

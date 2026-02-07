@@ -7,10 +7,11 @@ Routes API requests (e.g., /api/papers/) to the appropriate View logic.
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import PaperViewSet, TaskStatusView, PingView
+from .views import PaperViewSet, TaskStatusView, PingView, CollectionViewSet
 
 router = DefaultRouter()
 router.register(r'papers', PaperViewSet, basename='paper')
+router.register(r'collections', CollectionViewSet, basename='collection')
 
 urlpatterns = [
     path('', include(router.urls)),

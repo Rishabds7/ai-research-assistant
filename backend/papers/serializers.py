@@ -6,8 +6,36 @@ File: backend/papers/serializers.py
 Converts Database Models into JSON format for the Frontend API.
 """
 from rest_framework import serializers
-from .models import Paper, Methodology, SectionSummary, TaskStatus
+from .models import Paper, Methodology, SectionSummary, TaskStatus, Collection
 import json
+
+
+class CollectionListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for collection list views."""
+    paper_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Collection
+        fields = ['id', 'name', 'description', 'paper_count', 'created_at', 'updated_at']
+    
+    def get_paper_count(self, obj):
+        return obj.papers.count()
+
+
+class CollectionDetailSerializer(serializers.ModelSerializer):
+    """Detailed serializer with nested paper data."""
+    papers = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Collection
+        fields = ['id', 'name', 'description', 'papers', 'created_at', 'updated_at']
+    
+    def get_papers(self, obj):
+        # Use PaperListSerializer for nested papers
+        from .serializers import PaperListSerializer
+        return PaperListSerializer(obj.papers.all(), many=True).data
+
+
 
 class MethodologySerializer(serializers.ModelSerializer):
     class Meta:
