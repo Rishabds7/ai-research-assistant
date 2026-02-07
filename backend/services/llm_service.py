@@ -415,50 +415,83 @@ Snippets:
 
     def extract_licenses(self, paper_text: str) -> list[str]:
         """
-        Extracts licenses by scanning the WHOLE paper.
-        Gemini 1.5 Flash handles ~1M tokens, so we can afford to send the full text
-        of most papers (usually < 50k tokens) for maximum accuracy.
+        Hyper-accurate license scanner.
+        Combines targeted snippet extraction for high-signal areas 
+        with full-text scanning for global context.
         """
-        # 1. Cap the text to a very large but safe limit (approx 30k-40k tokens)
-        # This covers 99% of research papers entirely.
-        full_context = paper_text[:200000]
+        # 1. Target the High-Signal areas first (Head, Tail, Acknowledgments)
+        head = paper_text[:15000].replace('\n', ' ')
+        tail = paper_text[-15000:].replace('\n', ' ')
         
-        prompt = """You are a professional research librarian and license compliance auditor. 
-Your goal is to identify ALL licenses and usage terms mentioned in the research paper below. 
+        # Look for specific structural sections in the full text
+        structural = ""
+        for section in ["acknowledgments", "appendix", "data availability", "code availability", "software availability"]:
+            match = re.search(rf"\b{section}\b", paper_text, re.IGNORECASE)
+            if match:
+                start = max(0, match.start() - 1000)
+                end = min(len(paper_text), match.end() + 5000)
+                structural += f"\n[SECTION: {section.upper()}]\n{paper_text[start:end]}\n"
 
-Scope of Search:
-1. Licenses for the paper itself (e.g., CC BY 4.0).
-2. Licenses for source code or repositories mentioned (e.g., MIT, Apache).
-3. Licenses for datasets used or introduced (e.g., "available for non-commercial research").
-4. Any mention of "reproduced with permission", "copyright ©", or "under the terms of".
+        # 2. Prepare the Global Context (Capped to 150k for speed/cost)
+        global_context = paper_text[:150000]
+        
+        prompt = """You are a professional license auditor. Analyze the paper text below and identify ALL software, data, or content licenses.
+
+SEARCH STRATEGY:
+- Footnotes/Page bottoms: Often contain copyright (©) or "Licensed under..."
+- Acknowledgments: Where authors thank sources and mention usage terms.
+- Appendices: Detailed data/code availability sections.
+- Figure/Table captions: Small print mentioning source licenses.
+
+RECOGNIZED TYPES:
+- Standard: MIT, Apache 2.0, GPL, BSD, etc.
+- Creative Commons: CC-BY, CC0, CC BY-NC, etc.
+- Custom/Usage Terms: "available for non-commercial research", "restricted use", "citation required".
 
 Rules:
 1. Return ONLY a JSON LIST of strings: ["MIT License", "CC BY 4.0", ...]
-2. SCROLL THROUGH THE ENTIRE TEXT. Check figure captions, footnotes, and the very end of the paper.
-3. If NO explicit license or clear usage terms are found, return ["None mentioned"].
-4. Deduplicate and use standard names.
+2. Be AGGRESSIVE in searching—don't miss tiny mentions.
+3. If NO licenses or usage terms are found at all, return ["None mentioned"].
+4. Use standard names where possible.
 
-Paper Text:
+Paper Context for Deep Audit:
 ---
-""" + full_context + """
+[BEGINNING]
+""" + head + """
+
+[STRUCTURAL SECTIONS]
+""" + structural + """
+
+[END OF DOCUMENT]
+""" + tail + """
+
+[FULL PAPER SCAN (Truncated for performance)]
+""" + global_context + """
 ---
 
-Return ONLY a JSON list of strings."""
-        
+Return ONLY the JSON list of strings."""
+
         raw = self._generate(prompt)
         items = _parse_json_safe(raw, ["None mentioned"])
         
-        # Consistent cleaning
-        licenses = []
+        # Clean results
+        cleaned = []
         seen = set()
-        for item in items:
-            if isinstance(item, str):
-                lic = item.strip()
-                if lic and lic.lower() not in seen:
-                    licenses.append(lic)
-                    seen.add(lic.lower())
+        for i in items:
+            if not isinstance(i, str): continue
+            val = i.strip().strip('"').strip("'")
+            if val and val.lower() not in seen:
+                cleaned.append(val)
+                seen.add(val.lower())
         
-        return licenses if licenses else ["None mentioned"]
+        # If we got junk or empty after cleaning
+        if not cleaned: return ["None mentioned"]
+        
+        # If "None mentioned" is one of many, remove it
+        if len(cleaned) > 1 and "None mentioned" in cleaned:
+            cleaned = [c for c in cleaned if c != "None mentioned"]
+            
+        return cleaned
 
     def _pre_clean_content(self, text: str) -> str:
         """

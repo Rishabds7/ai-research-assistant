@@ -293,13 +293,13 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 </span>
                             )}
                         </div>
-                        {(datasetsTaskId || paper.task_ids?.datasets) && (
+                        {(isDsLoading || paper.task_ids?.datasets) && (
                             <div className="flex items-center gap-2 px-2 py-1 bg-[#1A365D]/10 text-[#1A365D] rounded-md border border-[#1A365D]/20">
                                 <Database className="h-3 w-3" />
                                 {(!paper.metadata?.datasets?.length || paper.metadata.datasets[0] === "None mentioned") ? 0 : paper.metadata.datasets.length} Datasets
                             </div>
                         )}
-                        {(licensesTaskId || paper.task_ids?.licenses) && (
+                        {(isLicLoading || paper.task_ids?.licenses) && (
                             <div className="flex items-center gap-2 px-2 py-1 bg-[#D4AF37]/10 text-[#D4AF37] rounded-md border border-[#D4AF37]/20">
                                 <Award className="h-3 w-3" />
                                 {(!paper.metadata?.licenses?.length || paper.metadata.licenses[0] === "None mentioned") ? 0 : paper.metadata.licenses.length} Licenses
