@@ -31,16 +31,44 @@ class EmbeddingService:
         if not settings.GEMINI_API_KEY:
             logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model_name = "models/embedding-001"
+        # Default to the most stable model as of Feb 2026
+        self.model_name = "models/gemini-embedding-001"
+        self._model_confirmed = False
 
+    def _ensure_model(self):
+        """
+        Ensures we have a working model if we haven't already confirmed one.
+        """
+        if self._model_confirmed:
+            return
+
+        test_text = "test"
+        # Try our known list
+        models_to_try = [
+            "models/gemini-embedding-001", # Priority 1
+            "models/text-embedding-004",   # Priority 2
+            "models/embedding-001"         # Priority 3
+        ]
+        
+        for model in models_to_try:
+            try:
+                genai.embed_content(model=model, content=test_text, task_type="retrieval_document")
+                self.model_name = model
+                self._model_confirmed = True
+                return
+            except Exception:
+                continue
+        
     def generate_embedding(self, text: str) -> List[float]:
         """
-        Calls Google's Embedding API.
+        Calls Google's Embedding API with fallback models.
         Returns a 768-length vector.
         """
         if not text.strip():
             return []
             
+        self._ensure_model()
+        
         try:
             result = genai.embed_content(
                 model=self.model_name,
@@ -50,14 +78,26 @@ class EmbeddingService:
             )
             return result['embedding']
         except Exception as e:
-            logger.error(f"Google Embedding Error: {e}")
-            return []
+            logger.error(f"Google Embedding Error (model {self.model_name}): {e}")
+            # Final desperate fallback attempt
+            try:
+                result = genai.embed_content(
+                    model="models/gemini-embedding-001",
+                    content=text,
+                    task_type="retrieval_document"
+                )
+                return result['embedding']
+            except:
+                return []
 
     def store_embeddings(self, paper_instance, sections: Dict[str, str], chunk_size: int = 1500):
         """
         Splits paper into chunks and stores their Google embeddings in PostgreSQL.
         Uses batching to stay fast and avoid rate limits.
         """
+        # Ensure we have a working model first
+        self._ensure_model()
+        
         # Clear existing
         EmbeddingModel.objects.filter(paper=paper_instance).delete()
         
@@ -82,7 +122,7 @@ class EmbeddingService:
         if not all_chunks:
             return
 
-        logger.info(f"Generating embeddings for {len(all_chunks)} chunks in batches...")
+        logger.info(f"Generating embeddings for {len(all_chunks)} chunks in batches using {self.model_name}...")
         
         embeddings_to_create = []
         # Google API supports batching multiple contents in one call
@@ -110,9 +150,23 @@ class EmbeddingService:
                         )
                     )
             except Exception as e:
-                logger.error(f"Batch Embedding Error at index {i}: {e}")
+                logger.error(f"Batch Embedding Error at index {i} with {self.model_name}: {e}")
+                
                 # Fallback: try individual if batch fails (rare)
-                continue
+                for item in batch:
+                    try:
+                        vec = self.generate_embedding(item["text"])
+                        if vec:
+                            embeddings_to_create.append(
+                                EmbeddingModel(
+                                    paper=paper_instance,
+                                    section_name=item["section"],
+                                    text=item["text"],
+                                    embedding=vec
+                                )
+                            )
+                    except:
+                        continue
 
         if embeddings_to_create:
             EmbeddingModel.objects.bulk_create(embeddings_to_create, batch_size=100)
