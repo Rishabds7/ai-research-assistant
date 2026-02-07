@@ -4,7 +4,7 @@ Project: Research Assistant
 File: backend/services/embedding_service.py
 
 This service handles converting text into numerical vectors (Embeddings)
-using Google's 'text-embedding-004' model. 
+using Google's 'gemini-embedding-001' model. 
 
 BENEFITS:
 - Cloud-based: No local RAM/GPU required (saves $30/mo on Render).
@@ -31,7 +31,7 @@ class EmbeddingService:
         if not settings.GEMINI_API_KEY:
             logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model_name = "models/text-embedding-004"
+        self.model_name = "models/gemini-embedding-001"
 
     def generate_embedding(self, text: str) -> List[float]:
         """
