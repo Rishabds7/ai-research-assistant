@@ -437,22 +437,21 @@ Snippets:
         
         prompt = """You are a professional license auditor. Analyze the paper text below and identify ALL software, data, or content licenses.
 
-SEARCH STRATEGY:
-- Footnotes/Page bottoms: Often contain copyright (©) or "Licensed under..."
-- Acknowledgments: Where authors thank sources and mention usage terms.
-- Appendices: Detailed data/code availability sections.
-- Figure/Table captions: Small print mentioning source licenses.
-
-RECOGNIZED TYPES:
-- Standard: MIT, Apache 2.0, GPL, BSD, etc.
-- Creative Commons: CC-BY, CC0, CC BY-NC, etc.
-- Custom/Usage Terms: "available for non-commercial research", "restricted use", "citation required".
-
 Rules:
 1. Return ONLY a JSON LIST of strings: ["MIT License", "CC BY 4.0", ...]
-2. Be AGGRESSIVE in searching—don't miss tiny mentions.
-3. If NO licenses or usage terms are found at all, return ["None mentioned"].
-4. Use standard names where possible.
+2. ONLY include actual LEGAL LICENSES. 
+3. DO NOT include software frameworks or libraries (e.g., "TensorFlow", "PyTorch", "JAX", "NumPy")—these are NOT licenses.
+4. If NO valid licenses are found, return ["None mentioned"].
+5. Standardize names using the list of common licenses below as a reference.
+
+POSSIBLE LICENSES TO IDENTIFY:
+- Creative Commons: CC BY, CC BY-SA, CC BY-ND, CC BY-NC, CC BY-NC-SA, CC BY-NC-ND, CC0
+- Software: MIT License, Apache License 2.0, BSD 2-Clause, BSD 3-Clause, ISC License, Boost Software License 1.0, zlib License
+- GNU: GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, AGPL-3.0
+- Other: Mozilla Public License 2.0 (MPL-2.0), Eclipse Public License 2.0 (EPL-2.0), CDDL-1.0
+- Database/Data: Open Database License (ODbL), ODC-By, PDDL, Public Domain Mark
+- AI/ML Specific: CreativeML OpenRAIL-M, BigScience OpenRAIL-M, OpenRAIL-M
+- Research Terms: "available for non-commercial research", "restricted use", "citation required"
 
 Paper Context for Deep Audit:
 ---
