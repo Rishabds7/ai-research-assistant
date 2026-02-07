@@ -1,9 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { Paper, extractAllSections, deletePaper, extractMetadata, getMediaUrl, getBibTeX } from '@/lib/api';
+import { Paper, extractAllSections, deletePaper, extractMetadata, getMediaUrl, getBibTeX, Collection, getCollections, addPaperToCollection } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useTaskPoll } from '@/hooks/useTaskPoll';
-import { Loader2, FileText, CheckCircle2, Trash2, ChevronDown, ChevronRight, Database, Award, List, Eye, X, Download } from 'lucide-react';
+import { Loader2, FileText, CheckCircle2, Trash2, ChevronDown, ChevronRight, Database, Award, List, Eye, X, Download, FolderPlus } from 'lucide-react';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 interface PaperItemProps {
     paper: Paper;
@@ -34,6 +41,9 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     );
     const [isDsRequesting, setIsDsRequesting] = useState(false);
     const [isLicRequesting, setIsLicRequesting] = useState(false);
+    const [collections, setCollections] = useState<Collection[]>([]);
+    const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
+    const [addingToCollection, setAddingToCollection] = useState(false);
 
     // Refs for scroll-to functionality
     const summaryRef = useRef<HTMLDivElement>(null);
@@ -44,6 +54,19 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
         ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
+
+    // Fetch collections for add-to-collection dropdown
+    useEffect(() => {
+        const fetchCollections = async () => {
+            try {
+                const data = await getCollections();
+                setCollections(data);
+            } catch (error) {
+                console.error('Failed to fetch collections:', error);
+            }
+        };
+        fetchCollections();
+    }, []);
 
     // Sync task IDs from paper.task_ids if they become available or update
     useEffect(() => {
@@ -169,6 +192,20 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         }
     };
 
+    const handleAddToCollection = async (collectionId: string) => {
+        setAddingToCollection(true);
+        try {
+            await addPaperToCollection(collectionId, paper.id);
+            alert('Paper added to collection successfully!');
+            setShowCollectionDropdown(false);
+        } catch (error) {
+            console.error('Failed to add paper to collection:', error);
+            alert('Failed to add paper to collection');
+        } finally {
+            setAddingToCollection(false);
+        }
+    };
+
     const renderAuthors = () => {
         if (!paper.authors || paper.authors === "Unknown") return "Not Available";
         try {
@@ -288,6 +325,36 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                     <Download className="h-3.5 w-3.5" />
                                     Cite
                                 </Button>
+                                {collections.length > 0 && (
+                                    <div className="relative">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
+                                            onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
+                                            disabled={addingToCollection}
+                                        >
+                                            {addingToCollection ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderPlus className="h-3.5 w-3.5" />}
+                                            Add to Collection
+                                        </Button>
+                                        {showCollectionDropdown && (
+                                            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-[#F1E9D2] z-50">
+                                                <div className="p-2 space-y-1 max-h-64 overflow-y-auto">
+                                                    {collections.map((collection) => (
+                                                        <button
+                                                            key={collection.id}
+                                                            onClick={() => handleAddToCollection(collection.id)}
+                                                            className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-[#FDFBF7] text-[#1A365D] font-medium transition-colors"
+                                                        >
+                                                            <div className="font-bold">{collection.name}</div>
+                                                            <div className="text-xs text-slate-500 mt-0.5">{collection.paper_count || 0} papers</div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
                         <Button
@@ -542,6 +609,6 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     )}
                 </div>
             </CardContent>
-        </Card>
+        </Card >
     );
 }

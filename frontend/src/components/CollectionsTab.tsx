@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, FolderOpen, X } from 'lucide-react';
+import { Trash2, Plus, FolderOpen, X, Check } from 'lucide-react';
 
 interface CollectionsTabProps {
     papers: Paper[];
@@ -17,6 +17,8 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
     const [newCollectionName, setNewCollectionName] = useState('');
     const [newCollectionDescription, setNewCollectionDescription] = useState('');
     const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
+    const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
+    const [isAdding, setIsAdding] = useState(false);
 
     const fetchCollections = async () => {
         try {
@@ -62,15 +64,24 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
         }
     };
 
-    const handleAddPaper = async (paperId: string) => {
-        if (!selectedCollection) return;
+    const handleAddSelectedPapers = async () => {
+        if (!selectedCollection || selectedPapers.size === 0) return;
 
+        setIsAdding(true);
         try {
-            await addPaperToCollection(selectedCollection.id, paperId);
+            // Add all selected papers
+            await Promise.all(
+                Array.from(selectedPapers).map(paperId =>
+                    addPaperToCollection(selectedCollection.id, paperId)
+                )
+            );
+            setSelectedPapers(new Set());
             fetchCollections();
             onUpdate();
         } catch (error) {
-            console.error('Failed to add paper to collection:', error);
+            console.error('Failed to add papers to collection:', error);
+        } finally {
+            setIsAdding(false);
         }
     };
 
@@ -86,9 +97,24 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
         }
     };
 
+    const togglePaperSelection = (paperId: string) => {
+        const newSelection = new Set(selectedPapers);
+        if (newSelection.has(paperId)) {
+            newSelection.delete(paperId);
+        } else {
+            newSelection.add(paperId);
+        }
+        setSelectedPapers(newSelection);
+    };
+
     const isPaperInCollection = (paperId: string): boolean => {
         if (!selectedCollection?.papers) return false;
         return selectedCollection.papers.some(p => p.id === paperId);
+    };
+
+    const handleCollectionClick = (collection: Collection) => {
+        setSelectedCollection(collection);
+        setSelectedPapers(new Set());
     };
 
     return (
@@ -148,10 +174,10 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                     <Card
                         key={collection.id}
                         className={`cursor-pointer transition-all duration-300 ${selectedCollection?.id === collection.id
-                                ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/20 bg-[#FDFBF7]'
-                                : 'border-[#F1E9D2] hover:border-[#D4AF37]/50'
+                            ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/20 bg-[#FDFBF7]'
+                            : 'border-[#F1E9D2] hover:border-[#D4AF37]/50'
                             }`}
-                        onClick={() => setSelectedCollection(collection)}
+                        onClick={() => handleCollectionClick(collection)}
                     >
                         <CardHeader className="pb-4">
                             <div className="flex justify-between items-start">
@@ -204,49 +230,114 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                     <CardHeader>
                         <div className="flex justify-between items-center">
                             <CardTitle className="text-lg font-extrabold text-[#1A365D]">
-                                Manage Papers in "{selectedCollection.name}"
+                                {(selectedCollection.paper_count || 0) === 0 ? `Add Papers to "${selectedCollection.name}"` : `Manage "${selectedCollection.name}"`}
                             </CardTitle>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => setSelectedCollection(null)}
+                                onClick={() => {
+                                    setSelectedCollection(null);
+                                    setSelectedPapers(new Set());
+                                }}
                             >
                                 <X className="h-4 w-4" />
                             </Button>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
-                        {papers.map((paper) => {
-                            const inCollection = isPaperInCollection(paper.id);
-                            return (
-                                <div
-                                    key={paper.id}
-                                    className="flex justify-between items-center p-3 rounded-lg border border-[#F1E9D2] bg-white hover:bg-[#FDFBF7]/50 transition-colors"
-                                >
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-[#1A365D] truncate">
-                                            {paper.title || paper.filename}
-                                        </p>
-                                        {paper.authors && (
-                                            <p className="text-xs text-slate-500 truncate mt-0.5">
-                                                {paper.authors}
-                                            </p>
-                                        )}
-                                    </div>
+                    <CardContent className="space-y-4">
+                        {/* Empty State */}
+                        {(selectedCollection.paper_count || 0) === 0 && (
+                            <div className="text-center py-6 bg-white rounded-lg border border-[#F1E9D2]">
+                                <FolderOpen className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+                                <p className="text-sm font-medium text-slate-600">This collection is empty</p>
+                                <p className="text-xs text-slate-400 mt-1">Select papers below to add them</p>
+                            </div>
+                        )}
+
+                        {/* Papers in Collection */}
+                        {selectedCollection.papers && selectedCollection.papers.length > 0 && (
+                            <div className="space-y-2">
+                                <h3 className="text-sm font-bold text-[#1A365D] uppercase tracking-wide">Papers in Collection</h3>
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                    {selectedCollection.papers.map((paper) => (
+                                        <div
+                                            key={paper.id}
+                                            className="flex justify-between items-center p-3 rounded-lg border border-[#D4AF37]/20 bg-white"
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-[#1A365D] truncate">
+                                                    {paper.title || paper.filename}
+                                                </p>
+                                                {paper.authors && (
+                                                    <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                        {paper.authors}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleRemovePaper(paper.id)}
+                                                className="border-red-200 text-red-600 hover:bg-red-50 ml-2"
+                                            >
+                                                Remove
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Available Papers to Add */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-sm font-bold text-[#1A365D] uppercase tracking-wide">Available Papers</h3>
+                                {selectedPapers.size > 0 && (
                                     <Button
                                         size="sm"
-                                        variant={inCollection ? "outline" : "default"}
-                                        onClick={() => inCollection ? handleRemovePaper(paper.id) : handleAddPaper(paper.id)}
-                                        className={inCollection
-                                            ? "border-red-200 text-red-600 hover:bg-red-50"
-                                            : "bg-[#D4AF37] hover:bg-[#C19B2E] text-white"
-                                        }
+                                        onClick={handleAddSelectedPapers}
+                                        disabled={isAdding}
+                                        className="bg-[#D4AF37] hover:bg-[#C19B2E] text-white"
                                     >
-                                        {inCollection ? 'Remove' : 'Add'}
+                                        {isAdding ? 'Adding...' : `Add Selected (${selectedPapers.size})`}
                                     </Button>
-                                </div>
-                            );
-                        })}
+                                )}
+                            </div>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {papers.filter(p => !isPaperInCollection(p.id)).map((paper) => (
+                                    <div
+                                        key={paper.id}
+                                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${selectedPapers.has(paper.id)
+                                            ? 'border-[#D4AF37] bg-[#FDFBF7] ring-1 ring-[#D4AF37]/20'
+                                            : 'border-[#F1E9D2] bg-white hover:bg-[#FDFBF7]/50'
+                                            }`}
+                                        onClick={() => togglePaperSelection(paper.id)}
+                                    >
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${selectedPapers.has(paper.id)
+                                            ? 'border-[#D4AF37] bg-[#D4AF37]'
+                                            : 'border-slate-300'
+                                            }`}>
+                                            {selectedPapers.has(paper.id) && <Check className="h-3 w-3 text-white" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-[#1A365D] truncate">
+                                                {paper.title || paper.filename}
+                                            </p>
+                                            {paper.authors && (
+                                                <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                    {paper.authors}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                {papers.filter(p => !isPaperInCollection(p.id)).length === 0 && (
+                                    <div className="text-center py-6 text-slate-400">
+                                        <p className="text-sm">All papers are already in this collection</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
             )}
