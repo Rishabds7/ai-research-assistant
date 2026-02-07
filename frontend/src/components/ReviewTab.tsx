@@ -175,77 +175,80 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                                 {/* Expanded Content */}
                                 {isExpanded && (
                                     <div className="border-t border-[#F1E9D2]/50 animate-in slide-in-from-top-2 duration-300">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow className="bg-[#F1E9D2]/10 hover:bg-[#F1E9D2]/10 border-b border-[#F1E9D2]/50">
-                                                    <TableHead className="w-[180px] font-extrabold text-[#1A365D] uppercase text-[10px] tracking-widest pl-8 py-4">Document</TableHead>
-                                                    <TableHead className="font-extrabold text-[#1A365D] uppercase text-[10px] tracking-widest py-4 text-center">Global Summary</TableHead>
-                                                    <TableHead className="w-[280px] font-extrabold text-[#1A365D] uppercase text-[10px] tracking-widest pr-8 py-4 text-right">Notes</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                <TableRow className="hover:bg-transparent border-0">
-                                                    {/* Column 1: Document */}
-                                                    <TableCell className="align-top pl-8 py-8">
-                                                        <div className="space-y-4">
-                                                            <div className="font-bold text-[#1A365D] text-xs break-all leading-tight">
-                                                                {paper.filename}
-                                                            </div>
-                                                            <div className="pt-3 border-t border-[#F1E9D2]/30">
-                                                                <div className="text-[9px] text-slate-400 font-bold uppercase mb-1">Authors:</div>
-                                                                <div className="text-[11px] text-slate-600 italic font-medium leading-snug">
-                                                                    {renderAuthors(paper.authors)}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
+                                        <div className="grid grid-cols-[220px_1fr_300px] w-full bg-[#FCF9F1]/30">
+                                            {/* Header Row */}
+                                            <div className="col-span-3 grid grid-cols-[220px_1fr_300px] border-b border-[#F1E9D2]/50 bg-[#F1E9D2]/20">
+                                                <div className="px-8 py-3 text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest border-r border-[#F1E9D2]/50">Document</div>
+                                                <div className="px-10 py-3 text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest border-r border-[#F1E9D2]/50">AI Synthesis & Global Summary</div>
+                                                <div className="px-8 py-3 text-[10px] font-extrabold text-[#1A365D] uppercase tracking-widest text-right">Research Notes</div>
+                                            </div>
 
-                                                    {/* Column 2: Global Summary */}
-                                                    <TableCell className="align-top py-8 px-6">
-                                                        {summaryContent ? (
-                                                            <div className="bg-white p-6 rounded-2xl border border-[#F1E9D2]/40 shadow-inner-sm">
-                                                                <ul className="text-[13px] space-y-4 text-slate-700">
-                                                                    {summaryContent.split(/\r?\n/).filter(p => {
-                                                                        const clean = p.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim();
-                                                                        if (!clean || clean.length < 5) return false;
-                                                                        if (clean.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return false;
-                                                                        return true;
-                                                                    }).slice(0, 8).map((point, i) => (
-                                                                        <li key={i} className="flex gap-4 leading-relaxed">
-                                                                            <span className="text-[#D4AF37] font-extrabold shrink-0 mt-0.5">◇</span>
-                                                                            <span>{point.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim().replace(/\s+/g, ' ')}</span>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-200 text-center">
-                                                                <p className="text-sm text-slate-400 italic">No summary generated yet.</p>
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
+                                            {/* Content Columns */}
+                                            <div className="p-8 border-r border-[#F1E9D2]/50 space-y-6">
+                                                <div>
+                                                    <div className="text-[10px] text-slate-400 font-bold uppercase mb-2">Filename</div>
+                                                    <div className="font-bold text-[#1A365D] text-xs break-all leading-tight bg-white p-3 rounded-lg border border-[#F1E9D2]/30 shadow-sm">
+                                                        {paper.filename}
+                                                    </div>
+                                                </div>
+                                                <div className="pt-4 border-t border-[#F1E9D2]/30">
+                                                    <div className="text-[10px] text-slate-400 font-bold uppercase mb-2">Authors</div>
+                                                    <div className="text-[11px] text-slate-600 italic font-medium leading-relaxed bg-white/50 p-3 rounded-lg">
+                                                        {renderAuthors(paper.authors)}
+                                                    </div>
+                                                </div>
+                                            </div>
 
-                                                    {/* Column 3: Notes */}
-                                                    <TableCell className="align-top pr-8 py-8">
-                                                        <div
-                                                            onClick={(e) => { e.stopPropagation(); handleEditNotes(paper); }}
-                                                            className="cursor-pointer group relative p-6 rounded-2xl bg-white hover:bg-[#FDFBF7] border border-[#F1E9D2]/40 hover:border-[#D4AF37]/50 transition-all min-h-[160px] shadow-sm flex flex-col"
-                                                        >
-                                                            {paper.notes ? (
-                                                                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-                                                                    {paper.notes}
-                                                                </p>
-                                                            ) : (
-                                                                <p className="text-sm text-slate-300 italic">
-                                                                    Click to add your insights and key takeaways from this paper...
-                                                                </p>
-                                                            )}
-                                                            <FileEdit className="absolute bottom-4 right-4 h-4 w-4 text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            </TableBody>
-                                        </Table>
+                                            <div className="p-10 border-r border-[#F1E9D2]/50 bg-white/40">
+                                                {summaryContent ? (
+                                                    <div className="space-y-4">
+                                                        <ul className="text-[13px] space-y-5 text-slate-700">
+                                                            {summaryContent.split(/\r?\n/).filter(p => {
+                                                                const clean = p.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim();
+                                                                if (!clean || clean.length < 5) return false;
+                                                                if (clean.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return false;
+                                                                return true;
+                                                            }).slice(0, 10).map((point, i) => (
+                                                                <li key={i} className="flex gap-4 leading-relaxed group">
+                                                                    <div className="mt-1.5 flex-shrink-0">
+                                                                        <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
+                                                                    </div>
+                                                                    <span className="group-hover:text-black transition-colors">{point.replace(/^[ \t]*[•\-*–—\d\.:]+[ \t]*/, '').trim().replace(/\s+/g, ' ')}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center h-full py-10 opacity-40">
+                                                        <p className="text-sm text-slate-400 italic">Analysis in progress or not available.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="p-8">
+                                                <div
+                                                    onClick={(e) => { e.stopPropagation(); handleEditNotes(paper); }}
+                                                    className="cursor-pointer group relative p-6 rounded-2xl bg-white hover:bg-[#FDFBF7] border border-[#F1E9D2]/60 hover:border-[#D4AF37]/50 transition-all min-h-[220px] shadow-sm flex flex-col"
+                                                >
+                                                    <div className="flex items-center gap-2 mb-3 opacity-30">
+                                                        <FileEdit className="h-3 w-3" />
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider">Editor</span>
+                                                    </div>
+                                                    {paper.notes ? (
+                                                        <p className="text-[13px] text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                                            {paper.notes}
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-[13px] text-slate-300 italic leading-relaxed">
+                                                            Click here to capture your personal insights, key takeaways, or potential research gaps...
+                                                        </p>
+                                                    )}
+                                                    <div className="absolute bottom-4 right-4 h-8 w-8 rounded-full bg-[#D4AF37]/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                                        <FileEdit className="h-4 w-4 text-[#D4AF37]" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
