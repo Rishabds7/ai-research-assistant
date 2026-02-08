@@ -36,9 +36,29 @@ class CollectionDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description', 'papers', 'created_at', 'updated_at']
     
     def get_papers(self, obj):
+        """Return all papers in this collection, regardless of session."""
         # Use PaperListSerializer for nested papers
-        from .serializers import PaperListSerializer
-        return PaperListSerializer(obj.papers.all(), many=True).data
+        # Don't filter by session - papers in a collection should all be visible
+        
+        # NOTE: PaperListSerializer is defined later in this file, but available at runtime
+        # We need to import it carefully or use global scope. 
+        # Using global scope assuming module is fully loaded.
+        try:
+            # Check if PaperListSerializer is in globals
+            if 'PaperListSerializer' not in globals():
+                # Fallback import if for some reason it's not
+                from .serializers import PaperListSerializer
+            else:
+                PaperListSerializer = globals()['PaperListSerializer']
+                
+            papers = obj.papers.all()
+            print(f"DEBUG: Collection {obj.id} ({obj.name}) has {papers.count()} papers")
+            for p in papers:
+                print(f"DEBUG: - Paper {p.id}: {p.title}")
+            return PaperListSerializer(papers, many=True).data
+        except Exception as e:
+            print(f"DEBUG: Error serializing papers for collection {obj.id}: {e}")
+            return []
 
 
 

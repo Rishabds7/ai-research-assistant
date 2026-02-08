@@ -392,7 +392,16 @@ class CollectionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        paper = get_object_or_404(Paper, id=paper_id)
+        # Get paper and validate it belongs to the same session
+        session_id = request.headers.get('X-Session-ID')
+        try:
+            paper = Paper.objects.get(id=paper_id, session_id=session_id)
+        except Paper.DoesNotExist:
+            return Response(
+                {'error': 'Paper not found or does not belong to this session'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
         collection.papers.add(paper)
         
         return Response({
