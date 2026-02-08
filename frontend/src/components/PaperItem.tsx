@@ -581,7 +581,16 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                 {(summarizeTaskId || paper.section_summaries?.length > 0) && (
                     <div ref={summaryRef} className="space-y-5 pt-8 border-t border-[#F1E9D2]/40 mt-8 scroll-mt-6">
                         <button
-                            onClick={() => setIsSummariesVisible(!isSummariesVisible)}
+                            onClick={() => {
+                                const newVisibility = !isSummariesVisible;
+                                setIsSummariesVisible(newVisibility);
+                                // Auto-scroll to summary section when expanding
+                                if (newVisibility) {
+                                    setTimeout(() => {
+                                        summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }, 100);
+                                }
+                            }}
                             className="w-full flex items-center justify-between group cursor-pointer"
                         >
                             <div className="flex items-center gap-3">
