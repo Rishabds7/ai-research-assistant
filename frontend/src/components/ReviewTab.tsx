@@ -1,10 +1,11 @@
 "use client";
 
 import { Paper, updatePaper, Collection, getCollections } from "@/lib/api";
+import React, { useState, useEffect, useRef } from "react";
+import { Download, ChevronDown, FileText, Calendar, Users, ExternalLink, Loader2, BookOpen, AlertCircle, FileEdit, X, FolderOpen } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Button } from "./ui/button";
-import { Download, FileEdit, X, ChevronDown, FolderOpen } from "lucide-react";
-import React, { useState, useEffect } from "react";
 import { Textarea } from "./ui/textarea";
 import {
     Select,
@@ -91,11 +92,26 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
         }
     }
 
+    const paperRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
     const toggleExpand = (id: string) => {
         setExpandedPapers(prev => {
             const next = new Set(prev);
+            const isExpanding = !next.has(id);
+
             if (next.has(id)) next.delete(id);
             else next.add(id);
+
+            // Auto-scroll logic similar to PaperItem
+            if (isExpanding) {
+                setTimeout(() => {
+                    const element = paperRefs.current[id];
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 100);
+            }
+
             return next;
         });
     };
@@ -207,6 +223,9 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                         return (
                             <div
                                 key={paper.id}
+                                ref={el => {
+                                    if (el) paperRefs.current[paper.id] = el;
+                                }}
                                 className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden shadow-sm ${isExpanded ? 'border-[#D4AF37] ring-1 ring-[#D4AF37]/20' : 'border-[#F1E9D2] hover:border-[#D4AF37]/50 hover:shadow-md'}`}
                             >
                                 {/* Collapsed Row / Trigger */}

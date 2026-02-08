@@ -25,19 +25,26 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
         try {
             const data = await getCollections();
             setCollections(data);
-            // Update selected collection if it's still selected
+
+            // If a collection is selected, refresh its details to reflect new papers
             if (selectedCollection) {
-                const updated = data.find(c => c.id === selectedCollection.id);
-                if (updated) setSelectedCollection(updated);
+                const { getCollection } = await import('@/lib/api');
+                try {
+                    const updatedCollection = await getCollection(selectedCollection.id);
+                    setSelectedCollection(updatedCollection);
+                } catch (e) {
+                    console.error("Failed to refresh selected collection", e);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch collections:', error);
         }
     };
 
+    // Fetch collections on mount and when papers change
     useEffect(() => {
         fetchCollections();
-    }, []);
+    }, [papers]);
 
     const handleCreateCollection = async () => {
         if (!newCollectionName.trim()) return;
