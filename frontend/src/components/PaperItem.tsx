@@ -50,9 +50,9 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const datasetsRef = useRef<HTMLDivElement>(null);
     const licensesRef = useRef<HTMLDivElement>(null);
 
-    // Scroll to section helper
-    const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
-        ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Scroll to section helper with better positioning
+    const scrollToSection = (ref: React.RefObject<HTMLDivElement>, block: ScrollLogicalPosition = 'center') => {
+        ref.current?.scrollIntoView({ behavior: 'smooth', block });
     };
 
     // Fetch collections for add-to-collection dropdown
@@ -165,9 +165,19 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const isDsLoading = isDsRequesting || (!!datasetsTaskId && (dsStatus === 'idle' || dsStatus === 'pending' || dsStatus === 'running'));
     const isLicLoading = isLicRequesting || (!!licensesTaskId && (licStatus === 'idle' || licStatus === 'pending' || licStatus === 'running'));
 
-    const toggleSection = (name: string) => {
-        setExpandedSections(prev => ({ ...prev, [name]: !prev[name] }));
+    const toggleSection = (name: string, sectionElement?: HTMLElement) => {
+        setExpandedSections(prev => {
+            const newExpanded = !prev[name];
+            // Auto-scroll to section when expanding
+            if (newExpanded && sectionElement) {
+                setTimeout(() => {
+                    sectionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+            return { ...prev, [name]: newExpanded };
+        });
     };
+
 
     const handleDelete = async () => {
         if (!confirm('Are you sure you want to delete this paper?')) return;
@@ -204,7 +214,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
             // Check if paper is already in the collection
             const selectedCollection = collections.find(c => c.id === collectionId);
             if (selectedCollection?.papers?.some(p => p.id === paper.id)) {
-                alert('This paper has already been added to this collection.');
+                alert('Paper already added to this collection.');
                 setShowCollectionDropdown(false);
                 setAddingToCollection(false);
                 return;
@@ -217,6 +227,9 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
             // Refresh collections to update paper lists
             const data = await getCollections();
             setCollections(data);
+
+            // Refresh parent component to update collection counts
+            onUpdate();
         } catch (error) {
             console.error('Failed to add paper to collection:', error);
             alert('Failed to add paper to collection');
@@ -593,7 +606,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                             className={`rounded-2xl border transition-all duration-300 overflow-hidden ${isExpanded ? "border-[#D4AF37] shadow-md ring-1 ring-[#D4AF37]/10" : "border-[#F1E9D2]/60 hover:border-[#D4AF37]/50"}`}
                                         >
                                             <button
-                                                onClick={() => toggleSection(s.section_name)}
+                                                onClick={(e) => toggleSection(s.section_name, e.currentTarget.parentElement as HTMLElement)}
                                                 className={`w-full flex items-center justify-between px-6 py-5 text-left transition-colors ${isExpanded ? "bg-[#FDFBF7]" : "bg-white hover:bg-[#FDFBF7]/30"}`}
                                             >
                                                 <span className={`text-sm font-extrabold tracking-tight capitalize ${isExpanded ? "text-[#D4AF37]" : "text-[#1A365D]"}`}>
