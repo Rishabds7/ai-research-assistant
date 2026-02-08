@@ -101,6 +101,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const { status: sumStatus } = useTaskPoll(summarizeTaskId, () => {
         onUpdate();
         setSummarizeTaskId(null);
+        // Auto-scroll to summaries after generation
+        setTimeout(() => scrollToSection(summaryRef), 500);
     });
 
     // Poll for datasets
@@ -108,6 +110,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         onUpdate();
         setDatasetsTaskId(null);
         setIsDsRequesting(false);
+        // Auto-scroll to datasets after generation
+        setTimeout(() => scrollToSection(datasetsRef), 500);
     });
 
     // Poll for licenses
@@ -115,6 +119,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         onUpdate();
         setLicensesTaskId(null);
         setIsLicRequesting(false);
+        // Auto-scroll to licenses after generation
+        setTimeout(() => scrollToSection(licensesRef), 500);
     });
 
     const handleSummarize = async () => {
@@ -195,9 +201,22 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const handleAddToCollection = async (collectionId: string) => {
         setAddingToCollection(true);
         try {
+            // Check if paper is already in the collection
+            const selectedCollection = collections.find(c => c.id === collectionId);
+            if (selectedCollection?.papers?.some(p => p.id === paper.id)) {
+                alert('This paper has already been added to this collection.');
+                setShowCollectionDropdown(false);
+                setAddingToCollection(false);
+                return;
+            }
+
             await addPaperToCollection(collectionId, paper.id);
             alert('Paper added to collection successfully!');
             setShowCollectionDropdown(false);
+
+            // Refresh collections to update paper lists
+            const data = await getCollections();
+            setCollections(data);
         } catch (error) {
             console.error('Failed to add paper to collection:', error);
             alert('Failed to add paper to collection');
@@ -528,7 +547,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                             </div>
                         </div>
                         <div className="space-y-2 pt-4 border-t border-[#F1E9D2]/30">
-                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">Lead Authors</h4>
+                            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">Authors</h4>
                             <div className={`text-[13px] leading-snug font-medium italic ${(!paper.authors || paper.authors === "Unknown") ? "text-slate-400 italic" : "text-slate-600"}`}>
                                 {!paper.processed ? (
                                     <span className="flex items-center gap-2 text-slate-400 italic font-medium">

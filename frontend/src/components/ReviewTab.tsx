@@ -157,14 +157,14 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                     <h2 className="text-2xl font-bold text-[#1A365D]">Literature Review</h2>
                     {collections.length > 0 && (
                         <Select value={selectedCollectionId || "all"} onValueChange={(val) => setSelectedCollectionId(val === "all" ? null : val)}>
-                            <SelectTrigger className="w-[240px] border-[#F1E9D2] bg-white hover:bg-[#FDFBF7] rounded-xl font-bold text-sm">
+                            <SelectTrigger className="w-[240px] border-2 border-[#D4AF37]/30 bg-white hover:bg-[#FDFBF7] hover:border-[#D4AF37] rounded-xl font-bold text-sm shadow-sm transition-all">
                                 <FolderOpen className="h-4 w-4 mr-2 text-[#D4AF37]" />
                                 <SelectValue placeholder="Filter by collection" />
                             </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all" className="font-bold">All Papers</SelectItem>
+                            <SelectContent className="rounded-xl border-2 border-[#D4AF37]/30">
+                                <SelectItem value="all" className="font-bold text-[#1A365D]">All Papers</SelectItem>
                                 {collections.map((collection) => (
-                                    <SelectItem key={collection.id} value={collection.id}>
+                                    <SelectItem key={collection.id} value={collection.id} className="font-medium">
                                         {collection.name} ({collection.paper_count || 0})
                                     </SelectItem>
                                 ))}

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, FolderOpen, X, Check } from 'lucide-react';
+import { Trash2, Plus, FolderOpen, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface CollectionsTabProps {
     papers: Paper[];
@@ -19,11 +19,17 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
     const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
     const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
     const [isAdding, setIsAdding] = useState(false);
+    const [showAddPapers, setShowAddPapers] = useState(false);
 
     const fetchCollections = async () => {
         try {
             const data = await getCollections();
             setCollections(data);
+            // Update selected collection if it's still selected
+            if (selectedCollection) {
+                const updated = data.find(c => c.id === selectedCollection.id);
+                if (updated) setSelectedCollection(updated);
+            }
         } catch (error) {
             console.error('Failed to fetch collections:', error);
         }
@@ -76,6 +82,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                 )
             );
             setSelectedPapers(new Set());
+            setShowAddPapers(false);
             fetchCollections();
             onUpdate();
         } catch (error) {
@@ -115,7 +122,10 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
     const handleCollectionClick = (collection: Collection) => {
         setSelectedCollection(collection);
         setSelectedPapers(new Set());
+        setShowAddPapers(false);
     };
+
+    const availablePapers = papers.filter(p => !isPaperInCollection(p.id));
 
     return (
         <div className="space-y-6">
@@ -224,13 +234,13 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                 )}
             </div>
 
-            {/* Paper Management Section */}
+            {/* Collection Details View */}
             {selectedCollection && (
                 <Card className="border-[#D4AF37] bg-[#FDFBF7]">
                     <CardHeader>
                         <div className="flex justify-between items-center">
-                            <CardTitle className="text-lg font-extrabold text-[#1A365D]">
-                                {(selectedCollection.paper_count || 0) === 0 ? `Add Papers to "${selectedCollection.name}"` : `Manage "${selectedCollection.name}"`}
+                            <CardTitle className="text-xl font-extrabold text-[#1A365D]">
+                                {selectedCollection.name}
                             </CardTitle>
                             <Button
                                 variant="ghost"
@@ -238,87 +248,25 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                 onClick={() => {
                                     setSelectedCollection(null);
                                     setSelectedPapers(new Set());
+                                    setShowAddPapers(false);
                                 }}
                             >
                                 <X className="h-4 w-4" />
                             </Button>
                         </div>
+                        {selectedCollection.description && (
+                            <p className="text-sm text-slate-600 mt-2">{selectedCollection.description}</p>
+                        )}
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {/* Empty State */}
-                        {(selectedCollection.paper_count || 0) === 0 && (
-                            <div className="text-center py-6 bg-white rounded-lg border border-[#F1E9D2]">
-                                <FolderOpen className="h-10 w-10 mx-auto mb-2 text-slate-300" />
-                                <p className="text-sm font-medium text-slate-600">This collection is empty</p>
-                                <p className="text-xs text-slate-400 mt-1">Select papers below to add them</p>
-                            </div>
-                        )}
-
                         {/* Papers in Collection */}
-                        {selectedCollection.papers && selectedCollection.papers.length > 0 && (
+                        {selectedCollection.papers && selectedCollection.papers.length > 0 ? (
                             <div className="space-y-2">
-                                <h3 className="text-sm font-bold text-[#1A365D] uppercase tracking-wide">Papers in Collection</h3>
-                                <div className="space-y-2 max-h-48 overflow-y-auto">
-                                    {selectedCollection.papers.map((paper) => (
-                                        <div
-                                            key={paper.id}
-                                            className="flex justify-between items-center p-3 rounded-lg border border-[#D4AF37]/20 bg-white"
-                                        >
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-bold text-[#1A365D] truncate">
-                                                    {paper.title || paper.filename}
-                                                </p>
-                                                {paper.authors && (
-                                                    <p className="text-xs text-slate-500 truncate mt-0.5">
-                                                        {paper.authors}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => handleRemovePaper(paper.id)}
-                                                className="border-red-200 text-red-600 hover:bg-red-50 ml-2"
-                                            >
-                                                Remove
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Available Papers to Add */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-bold text-[#1A365D] uppercase tracking-wide">Available Papers</h3>
-                                {selectedPapers.size > 0 && (
-                                    <Button
-                                        size="sm"
-                                        onClick={handleAddSelectedPapers}
-                                        disabled={isAdding}
-                                        className="bg-[#D4AF37] hover:bg-[#C19B2E] text-white"
-                                    >
-                                        {isAdding ? 'Adding...' : `Add Selected (${selectedPapers.size})`}
-                                    </Button>
-                                )}
-                            </div>
-                            <div className="space-y-2 max-h-64 overflow-y-auto">
-                                {papers.filter(p => !isPaperInCollection(p.id)).map((paper) => (
+                                {selectedCollection.papers.map((paper) => (
                                     <div
                                         key={paper.id}
-                                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${selectedPapers.has(paper.id)
-                                            ? 'border-[#D4AF37] bg-[#FDFBF7] ring-1 ring-[#D4AF37]/20'
-                                            : 'border-[#F1E9D2] bg-white hover:bg-[#FDFBF7]/50'
-                                            }`}
-                                        onClick={() => togglePaperSelection(paper.id)}
+                                        className="flex justify-between items-center p-3 rounded-lg border border-[#F1E9D2] bg-white hover:bg-[#FDFBF7]/50 transition-colors"
                                     >
-                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${selectedPapers.has(paper.id)
-                                            ? 'border-[#D4AF37] bg-[#D4AF37]'
-                                            : 'border-slate-300'
-                                            }`}>
-                                            {selectedPapers.has(paper.id) && <Check className="h-3 w-3 text-white" />}
-                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-bold text-[#1A365D] truncate">
                                                 {paper.title || paper.filename}
@@ -329,14 +277,87 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                                 </p>
                                             )}
                                         </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleRemovePaper(paper.id)}
+                                            className="border-red-200 text-red-600 hover:bg-red-50 ml-2"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
                                     </div>
                                 ))}
-                                {papers.filter(p => !isPaperInCollection(p.id)).length === 0 && (
-                                    <div className="text-center py-6 text-slate-400">
-                                        <p className="text-sm">All papers are already in this collection</p>
-                                    </div>
-                                )}
                             </div>
+                        ) : (
+                            <div className="text-center py-6 bg-white rounded-lg border border-[#F1E9D2]">
+                                <FolderOpen className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+                                <p className="text-sm font-medium text-slate-600">This collection is empty</p>
+                                <p className="text-xs text-slate-400 mt-1">Click "Add Papers" below to get started</p>
+                            </div>
+                        )}
+
+                        {/* Add Papers Section */}
+                        <div className="border-t border-[#F1E9D2] pt-4">
+                            <Button
+                                onClick={() => setShowAddPapers(!showAddPapers)}
+                                variant="outline"
+                                className="w-full border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-white font-bold"
+                            >
+                                {showAddPapers ? <ChevronUp className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                                {showAddPapers ? 'Hide Available Papers' : 'Add Papers'}
+                            </Button>
+
+                            {showAddPapers && (
+                                <div className="mt-4 space-y-2">
+                                    {selectedPapers.size > 0 && (
+                                        <div className="flex justify-between items-center mb-2">
+                                            <p className="text-sm text-slate-600">{selectedPapers.size} selected</p>
+                                            <Button
+                                                size="sm"
+                                                onClick={handleAddSelectedPapers}
+                                                disabled={isAdding}
+                                                className="bg-[#D4AF37] hover:bg-[#C19B2E] text-white"
+                                            >
+                                                {isAdding ? 'Adding...' : `Add Selected`}
+                                            </Button>
+                                        </div>
+                                    )}
+                                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                                        {availablePapers.map((paper) => (
+                                            <div
+                                                key={paper.id}
+                                                className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${selectedPapers.has(paper.id)
+                                                    ? 'border-[#D4AF37] bg-[#FDFBF7] ring-1 ring-[#D4AF37]/20'
+                                                    : 'border-[#F1E9D2] bg-white hover:bg-[#FDFBF7]/50'
+                                                    }`}
+                                                onClick={() => togglePaperSelection(paper.id)}
+                                            >
+                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${selectedPapers.has(paper.id)
+                                                    ? 'border-[#D4AF37] bg-[#D4AF37]'
+                                                    : 'border-slate-300'
+                                                    }`}>
+                                                    {selectedPapers.has(paper.id) && <Check className="h-3 w-3 text-white" />}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-bold text-[#1A365D] truncate">
+                                                        {paper.title || paper.filename}
+                                                    </p>
+                                                    {paper.authors && (
+                                                        <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                            {paper.authors}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {availablePapers.length === 0 && (
+                                            <div className="text-center py-6 text-slate-400">
+                                                <p className="text-sm">All papers are already in this collection</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
