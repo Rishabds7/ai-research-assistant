@@ -119,10 +119,21 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
         return selectedCollection.papers.some(p => p.id === paperId);
     };
 
-    const handleCollectionClick = (collection: Collection) => {
-        setSelectedCollection(collection);
-        setSelectedPapers(new Set());
-        setShowAddPapers(false);
+    const handleCollectionClick = async (collection: Collection) => {
+        try {
+            // Fetch full collection details with papers array
+            const { getCollection } = await import('@/lib/api');
+            const fullCollection = await getCollection(collection.id);
+            setSelectedCollection(fullCollection);
+            setSelectedPapers(new Set());
+            setShowAddPapers(false);
+        } catch (error) {
+            console.error('Failed to fetch collection details:', error);
+            // Fallback to using the list data
+            setSelectedCollection(collection);
+            setSelectedPapers(new Set());
+            setShowAddPapers(false);
+        }
     };
 
     const availablePapers = papers.filter(p => !isPaperInCollection(p.id));

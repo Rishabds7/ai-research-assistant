@@ -578,15 +578,19 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     </div>
                 </div>
 
-                {/* Section Summary with Accordion - Only show after Summarize is clicked or summaries exist */}
-                {(summarizeTaskId || paper.section_summaries?.length > 0) && (
+                {/* Section Summary with Accordion - Only show when summaries are ready */}
+                {paper.section_summaries?.length > 0 && (
                     <div ref={summaryRef} className="space-y-5 pt-8 border-t border-[#F1E9D2]/40 mt-8 scroll-mt-6">
                         <button
                             onClick={() => {
                                 const newVisibility = !isSummariesVisible;
                                 setIsSummariesVisible(newVisibility);
-                                // Auto-scroll to summary section when expanding
+
+                                // Collapse all individual sections when toggling
                                 if (newVisibility) {
+                                    // Reset expanded sections to show all collapsed
+                                    setExpandedSections({});
+                                    // Auto-scroll to summary section when expanding
                                     setTimeout(() => {
                                         summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                     }, 100);
