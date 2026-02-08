@@ -573,73 +573,75 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     </div>
                 </div>
 
-                {/* Section Summary with Accordion */}
-                <div ref={summaryRef} className="space-y-5 pt-8 border-t border-[#F1E9D2]/40 mt-8 scroll-mt-6">
-                    <button
-                        onClick={() => setIsSummariesVisible(!isSummariesVisible)}
-                        className="w-full flex items-center justify-between group cursor-pointer"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="h-8 w-1 bg-[#D4AF37] rounded-full"></div>
-                            <h4 className="text-lg font-extrabold text-[#1A365D] flex items-center gap-3 active:scale-95 transition-all">
-                                <div className="p-1.5 bg-[#D4AF37]/10 rounded-lg group-hover:bg-[#1A365D] transition-colors">
-                                    <List className="h-4 w-4 text-[#D4AF37] group-hover:text-white" />
-                                </div>
-                                Section Summary
-                            </h4>
-                        </div>
-                        <div className="flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-widest text-[#D4AF37] bg-[#D4AF37]/5 px-3 py-1.5 rounded-lg border border-[#D4AF37]/10 group-hover:bg-[#D4AF37] group-hover:text-white transition-all">
-                            {isSummariesVisible ? 'Collapse' : (paper.section_summaries?.length ? `View Sections (${paper.section_summaries.length})` : 'Summary')}
-                            <ChevronDown className={`h-3 w-3 transition-transform duration-300 ${isSummariesVisible ? 'rotate-180' : ''}`} />
-                        </div>
-                    </button>
+                {/* Section Summary with Accordion - Only show after Summarize is clicked or summaries exist */}
+                {(summarizeTaskId || paper.section_summaries?.length > 0) && (
+                    <div ref={summaryRef} className="space-y-5 pt-8 border-t border-[#F1E9D2]/40 mt-8 scroll-mt-6">
+                        <button
+                            onClick={() => setIsSummariesVisible(!isSummariesVisible)}
+                            className="w-full flex items-center justify-between group cursor-pointer"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-1 bg-[#D4AF37] rounded-full"></div>
+                                <h4 className="text-lg font-extrabold text-[#1A365D] flex items-center gap-3 active:scale-95 transition-all">
+                                    <div className="p-1.5 bg-[#D4AF37]/10 rounded-lg group-hover:bg-[#1A365D] transition-colors">
+                                        <List className="h-4 w-4 text-[#D4AF37] group-hover:text-white" />
+                                    </div>
+                                    Section Summary
+                                </h4>
+                            </div>
+                            <div className="flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-widest text-[#D4AF37] bg-[#D4AF37]/5 px-3 py-1.5 rounded-lg border border-[#D4AF37]/10 group-hover:bg-[#D4AF37] group-hover:text-white transition-all">
+                                {isSummariesVisible ? 'Collapse' : (paper.section_summaries?.length ? `View Sections (${paper.section_summaries.length})` : 'Summary')}
+                                <ChevronDown className={`h-3 w-3 transition-transform duration-300 ${isSummariesVisible ? 'rotate-180' : ''}`} />
+                            </div>
+                        </button>
 
-                    {isSummariesVisible && paper.section_summaries && paper.section_summaries.length > 0 && (
-                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                            {[...paper.section_summaries]
-                                .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-                                .map(s => {
-                                    const isExpanded = expandedSections[s.section_name] || false;
-                                    return (
-                                        <div
-                                            key={s.id}
-                                            className={`rounded-2xl border transition-all duration-300 overflow-hidden ${isExpanded ? "border-[#D4AF37] shadow-md ring-1 ring-[#D4AF37]/10" : "border-[#F1E9D2]/60 hover:border-[#D4AF37]/50"}`}
-                                        >
-                                            <button
-                                                onClick={(e) => toggleSection(s.section_name, e.currentTarget.parentElement as HTMLElement)}
-                                                className={`w-full flex items-center justify-between px-6 py-5 text-left transition-colors ${isExpanded ? "bg-[#FDFBF7]" : "bg-white hover:bg-[#FDFBF7]/30"}`}
+                        {isSummariesVisible && paper.section_summaries && paper.section_summaries.length > 0 && (
+                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                {[...paper.section_summaries]
+                                    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                                    .map(s => {
+                                        const isExpanded = expandedSections[s.section_name] || false;
+                                        return (
+                                            <div
+                                                key={s.id}
+                                                className={`rounded-2xl border transition-all duration-300 overflow-hidden ${isExpanded ? "border-[#D4AF37] shadow-md ring-1 ring-[#D4AF37]/10" : "border-[#F1E9D2]/60 hover:border-[#D4AF37]/50"}`}
                                             >
-                                                <span className={`text-sm font-extrabold tracking-tight capitalize ${isExpanded ? "text-[#D4AF37]" : "text-[#1A365D]"}`}>
-                                                    {s.section_name}
-                                                </span>
-                                                <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "rotate-180 text-[#D4AF37]" : "text-slate-300"}`} />
-                                            </button>
-                                            {isExpanded && (
-                                                <div className="px-10 py-8 bg-[#FCF9F1]/30 border-t border-[#F1E9D2]/50">
-                                                    <ul className="space-y-6">
-                                                        {s.summary.split(/\r?\n/).filter(Boolean).map((line, i) => {
-                                                            const cleanPoint = line.replace(/^[ \t]*([•\-*–—\d\.]+[ \t]*)+/, '').trim();
-                                                            if (!cleanPoint || cleanPoint.length < 4) return null;
-                                                            if (cleanPoint.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return null;
+                                                <button
+                                                    onClick={(e) => toggleSection(s.section_name, e.currentTarget.parentElement as HTMLElement)}
+                                                    className={`w-full flex items-center justify-between px-6 py-5 text-left transition-colors ${isExpanded ? "bg-[#FDFBF7]" : "bg-white hover:bg-[#FDFBF7]/30"}`}
+                                                >
+                                                    <span className={`text-sm font-extrabold tracking-tight capitalize ${isExpanded ? "text-[#D4AF37]" : "text-[#1A365D]"}`}>
+                                                        {s.section_name}
+                                                    </span>
+                                                    <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "rotate-180 text-[#D4AF37]" : "text-slate-300"}`} />
+                                                </button>
+                                                {isExpanded && (
+                                                    <div className="px-10 py-8 bg-[#FCF9F1]/30 border-t border-[#F1E9D2]/50">
+                                                        <ul className="space-y-6">
+                                                            {s.summary.split(/\r?\n/).filter(Boolean).map((line, i) => {
+                                                                const cleanPoint = line.replace(/^[ \t]*([•\-*–—\d\.]+[ \t]*)+/, '').trim();
+                                                                if (!cleanPoint || cleanPoint.length < 4) return null;
+                                                                if (cleanPoint.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return null;
 
-                                                            return (
-                                                                <li key={i} className="flex gap-4 text-[13px] text-slate-700 leading-relaxed group">
-                                                                    <div className="mt-1.5 shrink-0">
-                                                                        <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
-                                                                    </div>
-                                                                    <span className="group-hover:text-black transition-colors">{cleanPoint.replace(/\s+/g, ' ')}</span>
-                                                                </li>
-                                                            );
-                                                        })}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                    )}
-                </div>
+                                                                return (
+                                                                    <li key={i} className="flex gap-4 text-[13px] text-slate-700 leading-relaxed group">
+                                                                        <div className="mt-1.5 shrink-0">
+                                                                            <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
+                                                                        </div>
+                                                                        <span className="group-hover:text-black transition-colors">{cleanPoint.replace(/\s+/g, ' ')}</span>
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        )}
+                    </div>
+                )}
             </CardContent>
         </Card >
     );
