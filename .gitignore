@@ -89,3 +89,5 @@ temp/
 *.md
 !**/README.md
 !README_FULLSTACK.md
+!interview_prep/*.md
+!code_walkthrough/*.md
