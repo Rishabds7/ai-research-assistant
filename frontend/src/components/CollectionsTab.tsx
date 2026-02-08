@@ -280,11 +280,18 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                     >
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-bold text-[#1A365D] truncate">
-                                                {paper.title || paper.filename}
+                                                {(!paper.title || paper.title === 'Unknown') ? paper.filename : paper.title}
                                             </p>
-                                            {paper.authors && (
+                                            {paper.authors && paper.authors !== 'Unknown' && paper.authors !== 'Not Available' && (
                                                 <p className="text-xs text-slate-500 truncate mt-0.5">
-                                                    {paper.authors}
+                                                    {(() => {
+                                                        try {
+                                                            const parsed = JSON.parse(paper.authors);
+                                                            return Array.isArray(parsed) ? parsed.join(", ") : paper.authors;
+                                                        } catch {
+                                                            return paper.authors;
+                                                        }
+                                                    })()}
                                                 </p>
                                             )}
                                         </div>

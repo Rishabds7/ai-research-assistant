@@ -636,20 +636,37 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                                 {isExpanded && (
                                                     <div className="px-10 py-8 bg-[#FCF9F1]/30 border-t border-[#F1E9D2]/50">
                                                         <ul className="space-y-6">
-                                                            {s.summary.split(/\r?\n/).filter(Boolean).map((line, i) => {
-                                                                const cleanPoint = line.replace(/^[ \t]*([•\-*–—\d\.]+[ \t]*)+/, '').trim();
-                                                                if (!cleanPoint || cleanPoint.length < 4) return null;
-                                                                if (cleanPoint.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return null;
+                                                            {(() => {
+                                                                const lines = s.summary.split(/\r?\n/).filter(Boolean);
+                                                                const points = lines.map((line, i) => {
+                                                                    const cleanPoint = line.replace(/^[ \t]*([•\-*–—\d\.]+[ \t]*)+/, '').trim();
+                                                                    if (!cleanPoint || cleanPoint.length < 4) return null;
+                                                                    if (cleanPoint.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return null;
 
-                                                                return (
-                                                                    <li key={i} className="flex gap-4 text-[13px] text-slate-700 leading-relaxed group">
-                                                                        <div className="mt-1.5 shrink-0">
-                                                                            <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
-                                                                        </div>
-                                                                        <span className="group-hover:text-black transition-colors">{cleanPoint.replace(/\s+/g, ' ')}</span>
-                                                                    </li>
-                                                                );
-                                                            })}
+                                                                    return (
+                                                                        <li key={i} className="flex gap-4 text-[13px] text-slate-700 leading-relaxed group">
+                                                                            <div className="mt-1.5 shrink-0">
+                                                                                <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
+                                                                            </div>
+                                                                            <span className="group-hover:text-black transition-colors">{cleanPoint.replace(/\s+/g, ' ')}</span>
+                                                                        </li>
+                                                                    );
+                                                                }).filter(Boolean);
+
+                                                                if (points.length === 0) {
+                                                                    // Fallback: Show raw summary if no points were extracted (e.g. single paragraph)
+                                                                    return (
+                                                                        <li className="flex gap-4 text-[13px] text-slate-700 leading-relaxed group">
+                                                                            <div className="mt-1.5 shrink-0">
+                                                                                <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
+                                                                            </div>
+                                                                            <span className="group-hover:text-black transition-colors">{s.summary}</span>
+                                                                        </li>
+                                                                    );
+                                                                }
+
+                                                                return points;
+                                                            })()}
                                                         </ul>
                                                     </div>
                                                 )}
