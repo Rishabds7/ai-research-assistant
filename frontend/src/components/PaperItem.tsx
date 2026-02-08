@@ -211,8 +211,12 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const handleAddToCollection = async (collectionId: string) => {
         setAddingToCollection(true);
         try {
+            // Refresh collections first to get latest data for duplicate check
+            const latestCollections = await getCollections();
+            setCollections(latestCollections);
+
             // Check if paper is already in the collection
-            const selectedCollection = collections.find(c => c.id === collectionId);
+            const selectedCollection = latestCollections.find(c => c.id === collectionId);
             if (selectedCollection?.papers?.some(p => p.id === paper.id)) {
                 alert('Paper already added to this collection.');
                 setShowCollectionDropdown(false);
@@ -370,13 +374,13 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                             Add to Collection
                                         </Button>
                                         {showCollectionDropdown && (
-                                            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-[#F1E9D2] z-50">
+                                            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-2xl border-2 border-[#D4AF37]/30 z-100 backdrop-blur-sm">
                                                 <div className="p-2 space-y-1 max-h-64 overflow-y-auto">
                                                     {collections.map((collection) => (
                                                         <button
                                                             key={collection.id}
                                                             onClick={() => handleAddToCollection(collection.id)}
-                                                            className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-[#FDFBF7] text-[#1A365D] font-medium transition-colors"
+                                                            className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-[#D4AF37]/10 text-[#1A365D] font-medium transition-colors border border-transparent hover:border-[#D4AF37]/20"
                                                         >
                                                             <div className="font-bold">{collection.name}</div>
                                                             <div className="text-xs text-slate-500 mt-0.5">{collection.paper_count || 0} papers</div>
