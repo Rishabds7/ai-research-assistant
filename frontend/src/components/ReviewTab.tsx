@@ -84,8 +84,9 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
     // Apply collection filter if selected
     if (selectedCollectionId) {
         const selectedCollection = collections.find(c => c.id === selectedCollectionId);
-        if (selectedCollection?.papers) {
-            const collectionPaperIds = new Set(selectedCollection.papers.map(p => p.id));
+        const paperIds = selectedCollection?.paper_ids || [];
+        if (paperIds.length > 0) {
+            const collectionPaperIds = new Set(paperIds);
             reviewedPapers = reviewedPapers.filter(p => collectionPaperIds.has(p.id));
         }
     }
@@ -161,7 +162,7 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                                 <FolderOpen className="h-4 w-4 mr-2 text-[#D4AF37]" />
                                 <SelectValue placeholder="Filter by collection" />
                             </SelectTrigger>
-                            <SelectContent className="rounded-xl border-2 border-[#D4AF37]/30">
+                            <SelectContent className="rounded-xl border-2 border-[#D4AF37]/30 z-60 bg-white shadow-2xl">
                                 <SelectItem value="all" className="font-bold text-[#1A365D]">All Papers</SelectItem>
                                 {collections.map((collection) => (
                                     <SelectItem key={collection.id} value={collection.id} className="font-medium">

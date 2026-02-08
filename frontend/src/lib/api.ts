@@ -168,7 +168,8 @@ export interface Collection {
     name: string;
     description: string;
     paper_count?: number;
-    papers?: Paper[];
+    paper_ids?: string[];  // For duplicate detection
+    papers?: Paper[];      // Only in detail view
     created_at: string;
     updated_at: string;
 }

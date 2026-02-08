@@ -13,13 +13,18 @@ import json
 class CollectionListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for collection list views."""
     paper_count = serializers.SerializerMethodField()
+    paper_ids = serializers.SerializerMethodField()
     
     class Meta:
         model = Collection
-        fields = ['id', 'name', 'description', 'paper_count', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'paper_count', 'paper_ids', 'created_at', 'updated_at']
     
     def get_paper_count(self, obj):
         return obj.papers.count()
+    
+    def get_paper_ids(self, obj):
+        """Return list of paper IDs for duplicate detection."""
+        return list(obj.papers.values_list('id', flat=True))
 
 
 class CollectionDetailSerializer(serializers.ModelSerializer):

@@ -215,9 +215,10 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
             const latestCollections = await getCollections();
             setCollections(latestCollections);
 
-            // Check if paper is already in the collection
+            // Check if paper is already in the collection using paper_ids
             const selectedCollection = latestCollections.find(c => c.id === collectionId);
-            if (selectedCollection?.papers?.some(p => p.id === paper.id)) {
+            const paperIds = selectedCollection?.paper_ids || [];
+            if (paperIds.includes(paper.id)) {
                 alert('Paper already added to this collection.');
                 setShowCollectionDropdown(false);
                 setAddingToCollection(false);
