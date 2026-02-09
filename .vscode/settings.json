@@ -1,0 +1,20 @@
+{
+    "git.ignoreLimitWarning": true,
+    "css.lint.unknownAtRules": "ignore",
+    "scss.lint.unknownAtRules": "ignore",
+    "css.customData": [
+        ".vscode/tailwind-data.json"
+    ],
+    "files.associations": {
+        "*.css": "css"
+    },
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "package.json",
+                "**/package.json"
+            ],
+            "url": "./.vscode/package.schema.json"
+        }
+    ]
+}
