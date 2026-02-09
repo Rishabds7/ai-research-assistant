@@ -54,6 +54,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [hasCopied, setHasCopied] = useState(false);
 
     // Refs for scroll-to functionality
+    const cardRef = useRef<HTMLDivElement>(null);
     const summaryRef = useRef<HTMLDivElement>(null);
     const datasetsRef = useRef<HTMLDivElement>(null);
     const licensesRef = useRef<HTMLDivElement>(null);
@@ -285,8 +286,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
 
 
     return (
-        <Card className="mb-8 border-[#F1E9D2] hover:border-[#D4AF37]/50 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl overflow-hidden bg-white group">
-            <CardHeader className="pb-6 bg-[#FDFBF7] border-b border-[#F1E9D2]/40 transition-colors group-hover:bg-[#FDFBF7]/80">
+        <Card ref={cardRef} className="bg-white shadow-xl rounded-2xl overflow-hidden border-2 border-[#F1E9D2] transition-all duration-500 hover:shadow-2xl hover:border-[#D4AF37]/30">
+            <CardHeader className="bg-gradient-to-br from-[#FDFBF7] via-white to-[#F9F6ED] border-b-2 border-[#F1E9D2]/40 pb-7 pt-8 px-10">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-5">
                         <div className="bg-[#1A365D] p-3 rounded-xl shadow-lg shadow-blue-900/10 transform transition-transform group-hover:scale-105">
@@ -622,6 +623,11 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                     // Auto-scroll to summary section when expanding
                                     setTimeout(() => {
                                         summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }, 100);
+                                } else {
+                                    // Scroll to card top when collapsing
+                                    setTimeout(() => {
+                                        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                     }, 100);
                                 }
                             }}

@@ -13,6 +13,7 @@ interface CollectionsTabProps {
 
 export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
     const [collections, setCollections] = useState<Collection[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [newCollectionName, setNewCollectionName] = useState('');
     const [newCollectionDescription, setNewCollectionDescription] = useState('');
@@ -24,6 +25,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
     const [isGapAnalysisExpanded, setIsGapAnalysisExpanded] = useState(false);
 
     const fetchCollections = async () => {
+        setIsLoading(true);
         try {
             const data = await getCollections();
             setCollections(data);
@@ -40,6 +42,8 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
             }
         } catch (error) {
             console.error('Failed to fetch collections:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -283,7 +287,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                     </Card>
                 ))}
 
-                {collections.length === 0 && !isCreating && (
+                {collections.length === 0 && !isCreating && !isLoading && (
                     <div className="col-span-full text-center py-12 text-slate-400">
                         <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
                         <p className="font-medium">No collections yet</p>
