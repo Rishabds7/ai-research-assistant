@@ -175,7 +175,7 @@ export default function Home() {
                 PaperDigest <span className="text-[#D4AF37]">AI</span>
               </h1>
               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em] opacity-80">
-                AI-Powered Research Intelligence
+                AI-POWERED RESEARCH WORKSPACE
               </p>
             </div>
           </div>
@@ -226,7 +226,7 @@ export default function Home() {
               ) : (
                 <>
                   <UploadCloud className="mr-3 h-6 w-6" />
-                  <span className="text-base">Upload Research</span>
+                  <span className="text-base">Upload Research PDF</span>
                 </>
               )}
             </Button>
