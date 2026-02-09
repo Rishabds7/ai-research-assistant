@@ -159,7 +159,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="w-full max-w-[95%] 2xl:max-w-[1800px] mx-auto space-y-8">
         <div className="flex justify-between items-center bg-white/70 backdrop-blur-md p-6 rounded-3xl border border-[#F1E9D2] shadow-xl shadow-blue-900/5 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-900/10">
           <div className="flex items-center gap-6">
             <div className="relative group">
@@ -203,7 +203,7 @@ export default function Home() {
               </Button>
             </form>
 
-            <div className="text-[#1A365D]/20 font-black text-[9px] tracking-[0.4em]">OR</div>
+            <div className="text-[#1A365D]/60 font-black text-[10px] tracking-[0.4em]">OR</div>
 
             <input
               id="file-upload-input"
