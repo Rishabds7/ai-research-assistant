@@ -24,14 +24,18 @@ def patch_migrations():
             print("ERROR: django_migrations table not found.")
             return
 
-        # 2. Insert the new consolidated migration record
-        # We use ON CONFLICT DO NOTHING in case it's somehow already there
-        print("Inserting 0007_delete_gapanalysis_and_clear_embeddings record...")
-        cur.execute("""
-            INSERT INTO django_migrations (app, name, applied)
-            VALUES ('papers', '0007_delete_gapanalysis_and_clear_embeddings', %s)
-            ON CONFLICT (app, name) DO NOTHING;
-        """, (datetime.now(),))
+        # 2. Check if the record exists first
+        cur.execute("SELECT 1 FROM django_migrations WHERE app = %s AND name = %s", ('papers', '0007_delete_gapanalysis_and_clear_embeddings'))
+        exists = cur.fetchone()
+
+        if not exists:
+            print("Inserting 0007_delete_gapanalysis_and_clear_embeddings record...")
+            cur.execute("""
+                INSERT INTO django_migrations (app, name, applied)
+                VALUES ('papers', '0007_delete_gapanalysis_and_clear_embeddings', %s);
+            """, (datetime.now(),))
+        else:
+            print("Migration record already exists, skipping insertion.")
         
         # 3. Clean up the old duplicate migration records that might be there
         print("Cleaning up old migration records if they exist...")
@@ -46,6 +50,8 @@ def patch_migrations():
 
     except Exception as e:
         print(f"ERROR: Failed to patch database: {e}")
+        import sys
+        sys.exit(1)
 
 if __name__ == "__main__":
     patch_migrations()
