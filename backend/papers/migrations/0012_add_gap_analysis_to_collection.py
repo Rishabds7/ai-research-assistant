@@ -1,4 +1,5 @@
 # Generated manually for adding gap_analysis fields to Collection
+# Linearized to follow 0011_collection
 
 from django.db import migrations, models
 
@@ -6,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('papers', '0003_paper_task_ids'),
+        ('papers', '0011_collection'),
     ]
 
     operations = [
