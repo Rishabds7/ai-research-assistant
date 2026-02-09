@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, FolderOpen, X, Check, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
+import { Trash2, Plus, FolderOpen, X, Check, ChevronDown, ChevronUp, Lightbulb, Loader2 } from 'lucide-react';
 
 interface CollectionsTabProps {
     papers: Paper[];
@@ -430,61 +430,78 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                         </div>
 
                         {/* Gap Analysis Section */}
-                        {selectedCollection.papers && selectedCollection.papers.length >= 2 && (
-                            <div className="border-t border-[#F1E9D2] pt-4">
-                                {/* eslint-disable-next-line */}
-                                <Button
-                                    onClick={handleAnalyzeGaps}
-                                    disabled={!!gapAnalysisTaskId}
-                                    className="w-full bg-linear-to-r from-[#1A365D] to-[#2A4A7D] hover:from-[#0F172A] hover:to-[#1A365D] text-white font-bold"
-                                >
-                                    <Lightbulb className={`h-4 w-4 mr-2 ${gapAnalysisTaskId ? 'animate-pulse' : ''}`} />
-                                    {gapAnalysisTaskId ? 'Analyzing Research Gaps...' : 'Analyze Research Gaps'}
-                                </Button>
-
-                                {/* Gap Analysis Results */}
-                                {selectedCollection.gap_analysis && (
-                                    <div className="mt-4">
-                                        {/* eslint-disable-next-line */}
-                                        <button
-                                            onClick={() => setIsGapAnalysisExpanded(!isGapAnalysisExpanded)}
-                                            className="w-full flex items-center justify-between p-4 bg-linear-to-r from-[#1A365D]/5 to-[#2A4A7D]/5 rounded-lg border border-[#1A365D]/20 hover:bg-linear-to-r hover:from-[#1A365D]/10 hover:to-[#2A4A7D]/10 transition-all"
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <Lightbulb className="h-5 w-5 text-[#D4AF37]" />
-                                                <span className="font-extrabold text-[#1A365D]">Research Gap Analysis</span>
-                                            </div>
-                                            {isGapAnalysisExpanded ? (
-                                                <ChevronUp className="h-5 w-5 text-[#1A365D]" />
-                                            ) : (
-                                                <ChevronDown className="h-5 w-5 text-[#1A365D]" />
-                                            )}
-                                        </button>
-
-                                        {isGapAnalysisExpanded && (
-                                            <div className="mt-3 p-6 bg-white rounded-lg border border-[#F1E9D2]">
-                                                <div className="prose prose-sm max-w-none">
-                                                    <div
-                                                        className="text-[13px] text-slate-700 leading-relaxed"
-                                                        dangerouslySetInnerHTML={{
-                                                            __html: selectedCollection.gap_analysis
-                                                                .replace(/^##\s+(.+)$/gm, '<h3 class="text-base font-extrabold text-[#1A365D] mt-4 mb-2">$1</h3>')
-                                                                .replace(/^-\s+(.+)$/gm, '<li class="ml-4">$1</li>')
-                                                                .replace(/(<li.*<\/li>)/s, '<ul class="list-disc space-y-1">$1</ul>')
-                                                        }}
-                                                    />
-                                                </div>
-                                                {selectedCollection.gap_analysis_updated_at && (
-                                                    <p className="text-xs text-slate-400 mt-4 pt-4 border-t border-[#F1E9D2]">
-                                                        Last analyzed: {new Date(selectedCollection.gap_analysis_updated_at).toLocaleString()}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
+                        <div className="border-t border-[#F1E9D2] pt-4">
+                            {/* eslint-disable-next-line */}
+                            <Button
+                                onClick={handleAnalyzeGaps}
+                                disabled={!!gapAnalysisTaskId || !selectedCollection.papers || selectedCollection.papers.length < 2}
+                                className="w-full bg-linear-to-r from-[#1A365D] to-[#2A4A7D] hover:from-[#0F172A] hover:to-[#1A365D] text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {gapAnalysisTaskId ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Lightbulb className="h-4 w-4 mr-2" />
                                 )}
-                            </div>
-                        )}
+                                {gapAnalysisTaskId
+                                    ? 'Analyzing Research Gaps...'
+                                    : (!selectedCollection.papers || selectedCollection.papers.length < 2)
+                                        ? 'Add at least 2 papers to analyze'
+                                        : 'Analyze Research Gaps'
+                                }
+                            </Button>
+
+                            {/* Loading Spinner During Analysis */}
+                            {gapAnalysisTaskId && !selectedCollection.gap_analysis && (
+                                <div className="mt-4 p-6 bg-white rounded-lg border border-[#F1E9D2] flex flex-col items-center justify-center">
+                                    <Loader2 className="h-8 w-8 text-[#D4AF37] animate-spin mb-3" />
+                                    <p className="text-sm font-medium text-[#1A365D]">Analyzing research gaps...</p>
+                                    <p className="text-xs text-slate-500 mt-1">This may take a minute</p>
+                                </div>
+                            )}
+
+                            {/* Gap Analysis Results */}
+                            {selectedCollection.gap_analysis && (
+                                <div className="mt-4">
+                                    {/* eslint-disable-next-line */}
+                                    <button
+                                        onClick={() => setIsGapAnalysisExpanded(!isGapAnalysisExpanded)}
+                                        className="w-full flex items-center justify-between p-4 bg-linear-to-r from-[#1A365D]/5 to-[#2A4A7D]/5 rounded-lg border border-[#1A365D]/20 hover:bg-linear-to-r hover:from-[#1A365D]/10 hover:to-[#2A4A7D]/10 transition-all"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Lightbulb className="h-5 w-5 text-[#D4AF37]" />
+                                            <span className="font-extrabold text-[#1A365D]">Research Gap Analysis</span>
+                                        </div>
+                                        {isGapAnalysisExpanded ? (
+                                            <ChevronUp className="h-5 w-5 text-[#1A365D]" />
+                                        ) : (
+                                            <ChevronDown className="h-5 w-5 text-[#1A365D]" />
+                                        )}
+                                    </button>
+
+                                    {isGapAnalysisExpanded && (
+                                        <div className="mt-3 p-6 bg-white rounded-lg border border-[#F1E9D2]">
+                                            <div className="prose prose-sm max-w-none">
+                                                <div
+                                                    className="text-[13px] text-slate-700 leading-relaxed"
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: selectedCollection.gap_analysis
+                                                            .replace(/\*\*(.+?)\*\*/g, '$1') // Remove bold markers
+                                                            .replace(/^##\s+(.+)$/gm, '<h3 class="text-base font-extrabold text-[#1A365D] mt-4 mb-2">$1</h3>')
+                                                            .replace(/^-\s+(.+)$/gm, '<li class="ml-4">$1</li>')
+                                                            .replace(/(\<li.*\<\/li\>)/s, '<ul class="list-disc space-y-1">$1</ul>')
+                                                    }}
+                                                />
+                                            </div>
+                                            {selectedCollection.gap_analysis_updated_at && (
+                                                <p className="text-xs text-slate-400 mt-4 pt-4 border-t border-[#F1E9D2]">
+                                                    Last analyzed: {new Date(selectedCollection.gap_analysis_updated_at).toLocaleString()}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
             )}
