@@ -44,11 +44,11 @@ export function useTaskPoll(taskId: string | null, onComplete?: (result: any) =>
                 const data = await getTaskStatus(taskId);
                 setStatus(data.status);
 
-                if (data.status === 'completed') {
+                if (data.status === 'SUCCESS') {
                     setResult(data.result);
                     if (onComplete) onComplete(data.result);
                     return true;
-                } else if (data.status === 'failed') {
+                } else if (data.status === 'FAILURE') {
                     setError(data.error);
                     return true;
                 }

@@ -88,6 +88,6 @@ temp/
 # Documentation and Explanation files
 *.md
 !**/README.md
-!README_FULLSTACK.md
-!interview_prep/*.md
-!code_walkthrough/*.md
+project_design_documents/
+code_walkthrough/
+interview_prep/
