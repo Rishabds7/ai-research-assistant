@@ -128,7 +128,13 @@ export const uploadPaper = async (file: File): Promise<{ paper: Paper; task_id: 
  * Fetches all papers.
  */
 export const getPapers = async (): Promise<Paper[]> => {
-    const response = await api.get<any>('/papers/');
+    const response = await api.get<any>('/papers/', {
+        headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    });
     // Handle Django REST Framework pagination
     if (response.data && response.data.results) {
         return response.data.results;
