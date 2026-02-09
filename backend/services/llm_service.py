@@ -509,6 +509,10 @@ Snippets:
             
             papers_summary.append(paper_text)
         
+        # Python doesn't allow backslashes in f-string expressions, extract separator
+        separator = '\n\n---\n\n'
+        papers_text = separator.join(papers_summary)
+        
         prompt = f"""You are a research analyst identifying gaps across multiple academic papers.
 
 **Your Task:**
@@ -518,7 +522,7 @@ Analyze the following papers and provide:
 3. **Future Directions**: What are the most promising next steps?
 
 **Papers:**
-{'\n\n---\n\n'.join(papers_summary)}
+{papers_text}
 
 **Output Format** (Markdown with bullet points):
 ##  Common Themes
