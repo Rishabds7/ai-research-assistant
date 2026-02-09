@@ -485,10 +485,12 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                                     className="text-[13px] text-slate-700 leading-relaxed"
                                                     dangerouslySetInnerHTML={{
                                                         __html: selectedCollection.gap_analysis
-                                                            .replace(/\*\*(.+?)\*\*/g, '$1') // Remove bold markers
-                                                            .replace(/^##\s+(.+)$/gm, '<h3 class="text-base font-extrabold text-[#1A365D] mt-4 mb-2">$1</h3>')
-                                                            .replace(/^-\s+(.+)$/gm, '<li class="ml-4">$1</li>')
-                                                            .replace(/(\<li.*\<\/li\>)/s, '<ul class="list-disc space-y-1">$1</ul>')
+                                                            .replace(/\*\*/g, '') // Remove ALL ** markers (not just paired ones)
+                                                            .replace(/^##\s+(.+)$/gm, '<h3 class="text-base font-extrabold text-[#1A365D] mt-6 mb-3">$1</h3>')
+                                                            .replace(/^-\s+(.+)$/gm, '<li class="ml-6 mb-1">$1</li>')
+                                                            .replace(/(<li[^>]*>.*?<\/li>\s*)+/gs, (match) => 
+                                                                `<ul class="list-disc space-y-1 mb-4 pl-4">${match}</ul>`
+                                                            )
                                                     }}
                                                 />
                                             </div>
