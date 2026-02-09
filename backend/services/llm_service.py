@@ -543,8 +543,13 @@ Analyze the following papers and provide:
 - Be concise (3-5 points per section)
 """
         
+        logger.info("Starting gap analysis with Gemini LLM")
         result = self._generate(prompt)
-        return clean_llm_summary(result) if result else "Failed to generate gap analysis."
+        if not result or not result.strip():
+            logger.warning("Gemini LLM returned empty response for gap analysis")
+            return "Failed to generate gap analysis. The AI model returned an empty response. Please check your Gemini API key and try again."
+        logger.info("Gap analysis completed successfully")
+        return clean_llm_summary(result)
 
     def extract_licenses(self, paper_text: str) -> List[str]:
         """
@@ -1018,8 +1023,13 @@ Analyze the following papers and provide:
 - Be concise (3-5 points per section)
 """
         
+        logger.info(f"Starting gap analysis with Ollama LLM (host: {self.host}, model: {self.model})")
         result = self._generate(prompt)
-        return clean_llm_summary(result) if result else "Failed to generate gap analysis."
+        if not result or not result.strip():
+            logger.warning("Ollama LLM returned empty response for gap analysis")
+            return f"Failed to generate gap analysis. The AI model returned an empty response. Please ensure Ollama is running at {self.host} and the model '{self.model}' is available."
+        logger.info("Gap analysis completed successfully")
+        return clean_llm_summary(result)
 
     def summarize_sections(self, sections: Dict[str, str], full_text: str = "") -> Dict[str, str]:
         """
