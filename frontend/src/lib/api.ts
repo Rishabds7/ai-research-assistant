@@ -33,6 +33,9 @@ const getSessionId = (): string => {
     if (!sessionId) {
         sessionId = crypto.randomUUID();
         localStorage.setItem('research_session_id', sessionId);
+        console.log('[Session] Created new session ID:', sessionId);
+    } else {
+        console.log('[Session] Retrieved existing session ID:', sessionId);
     }
     return sessionId;
 };
@@ -42,6 +45,9 @@ api.interceptors.request.use((config) => {
     const sessionId = getSessionId();
     if (sessionId) {
         config.headers['X-Session-ID'] = sessionId;
+        console.log('[API] Request to:', config.url, 'with Session ID:', sessionId);
+    } else {
+        console.warn('[API] No session ID available for request to:', config.url);
     }
     return config;
 });
@@ -135,10 +141,13 @@ export const getPapers = async (): Promise<Paper[]> => {
             'Expires': '0'
         }
     });
+    console.log('[API] getPapers response:', response.data);
     // Handle Django REST Framework pagination
     if (response.data && response.data.results) {
+        console.log('[API] Found', response.data.results.length, 'papers (paginated)');
         return response.data.results;
     }
+    console.log('[API] Found', (response.data as Paper[]).length, 'papers (direct array)');
     return response.data as Paper[];
 };
 
