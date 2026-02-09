@@ -330,26 +330,26 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                         className="flex justify-between items-center p-3 rounded-lg border border-[#F1E9D2] bg-white hover:bg-[#FDFBF7]/50 transition-colors"
                                     >
                                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[#1A365D] flex items-center justify-center">
+                                            <div className="shrink-0 w-7 h-7 rounded-full bg-[#1A365D] flex items-center justify-center">
                                                 <span className="text-xs font-extrabold text-white">{index + 1}</span>
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-bold text-[#1A365D] truncate">
-                                                {(!paper.title || paper.title === 'Unknown') ? paper.filename : paper.title}
-                                            </p>
-                                            {paper.authors && paper.authors !== 'Unknown' && paper.authors !== 'Not Available' && (
-                                                <p className="text-xs text-slate-500 truncate mt-0.5">
-                                                    {(() => {
-                                                        try {
-                                                            const parsed = JSON.parse(paper.authors);
-                                                            return Array.isArray(parsed) ? parsed.join(", ") : paper.authors;
-                                                        } catch {
-                                                            return paper.authors;
-                                                        }
-                                                    })()}
+                                                <p className="text-sm font-bold text-[#1A365D] truncate">
+                                                    {(!paper.title || paper.title === 'Unknown') ? paper.filename : paper.title}
                                                 </p>
-                                            )}
-                                        </div>
+                                                {paper.authors && paper.authors !== 'Unknown' && paper.authors !== 'Not Available' && (
+                                                    <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                        {(() => {
+                                                            try {
+                                                                const parsed = JSON.parse(paper.authors);
+                                                                return Array.isArray(parsed) ? parsed.join(", ") : paper.authors;
+                                                            } catch {
+                                                                return paper.authors;
+                                                            }
+                                                        })()}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                         <Button
                                             size="sm"
@@ -493,7 +493,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                                             .replace(/\*\*/g, '') // Remove ALL ** markers (not just paired ones)
                                                             .replace(/^##\s+(.+)$/gm, '<h3 class="text-base font-extrabold text-[#1A365D] mt-6 mb-3">$1</h3>')
                                                             .replace(/^-\s+(.+)$/gm, '<li class="ml-6 mb-1">$1</li>')
-                                                            .replace(/(<li[^>]*>.*?<\/li>\s*)+/gs, (match) => 
+                                                            .replace(/(<li[^>]*>.*?<\/li>\s*)+/gs, (match) =>
                                                                 `<ul class="list-disc space-y-1 mb-4 pl-4">${match}</ul>`
                                                             )
                                                     }}

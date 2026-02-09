@@ -1156,8 +1156,19 @@ class LLMService:
             Union[GeminiLLMService, OllamaLLMService]: The configured LLM service instance.
         """
         if cls._instance is None:
+            logger.info("=" * 80)
+            logger.info(f"🤖 LLM SERVICE INITIALIZATION")
+            logger.info(f"   Provider: {LLM_PROVIDER.upper()}")
+            
             if LLM_PROVIDER == "gemini":
+                logger.info(f"   Model: {GEMINI_MODEL}")
+                logger.info(f"   Mode: CLOUD (Google Gemini API)")
                 cls._instance = GeminiLLMService()
             else:
+                logger.info(f"   Model: {OLLAMA_MODEL}")
+                logger.info(f"   Host: {OLLAMA_HOST}")
+                logger.info(f"   Mode: LOCAL (Ollama)")
                 cls._instance = OllamaLLMService()
+            
+            logger.info("=" * 80)
         return cls._instance
