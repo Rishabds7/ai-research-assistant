@@ -331,7 +331,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     </div>
                     <div className="flex items-center gap-2">
                         {paper.processed && (
-                            <div className="flex bg-white border border-[#F1E9D2] p-1 rounded-xl shadow-sm">
+                            <div className="flex bg-white border border-[#F1E9D2] p-2 rounded-xl shadow-sm gap-2">
                                 <Button
                                     variant="ghost"
                                     size="sm"
