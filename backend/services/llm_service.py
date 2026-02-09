@@ -543,7 +543,7 @@ Analyze the following papers and provide:
 - Be concise (3-5 points per section)
 """
         
-        result = self._generate(prompt=prompt, temperature=0.4, max_tokens=2000)
+        result = self._generate(prompt)
         return clean_llm_summary(result) if result else "Failed to generate gap analysis."
 
     def extract_licenses(self, paper_text: str) -> List[str]:
@@ -1018,7 +1018,7 @@ Analyze the following papers and provide:
 - Be concise (3-5 points per section)
 """
         
-        result = self._generate(prompt=prompt, temperature=0.4, max_tokens=2000)
+        result = self._generate(prompt)
         return clean_llm_summary(result) if result else "Failed to generate gap analysis."
 
     def summarize_sections(self, sections: Dict[str, str], full_text: str = "") -> Dict[str, str]:
