@@ -287,7 +287,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
 
     return (
         <Card ref={cardRef} className="bg-white shadow-xl rounded-2xl overflow-hidden border-2 border-[#F1E9D2] transition-all duration-500 hover:shadow-2xl hover:border-[#D4AF37]/30">
-            <CardHeader className="bg-gradient-to-br from-[#FDFBF7] via-white to-[#F9F6ED] border-b-2 border-[#F1E9D2]/40 pb-7 pt-8 px-10">
+            <CardHeader className="bg-linear-to-br from-[#FDFBF7] via-white to-[#F9F6ED] border-b-2 border-[#F1E9D2]/40 pb-7 pt-8 px-10">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-5">
                         <div className="bg-[#1A365D] p-3 rounded-xl shadow-lg shadow-blue-900/10 transform transition-transform group-hover:scale-105">

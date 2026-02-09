@@ -436,7 +436,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                 <Button
                                     onClick={handleAnalyzeGaps}
                                     disabled={!!gapAnalysisTaskId}
-                                    className="w-full bg-gradient-to-r from-[#1A365D] to-[#2A4A7D] hover:from-[#0F172A] hover:to-[#1A365D] text-white font-bold"
+                                    className="w-full bg-linear-to-r from-[#1A365D] to-[#2A4A7D] hover:from-[#0F172A] hover:to-[#1A365D] text-white font-bold"
                                 >
                                     <Lightbulb className={`h-4 w-4 mr-2 ${gapAnalysisTaskId ? 'animate-pulse' : ''}`} />
                                     {gapAnalysisTaskId ? 'Analyzing Research Gaps...' : 'Analyze Research Gaps'}
@@ -448,7 +448,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                         {/* eslint-disable-next-line */}
                                         <button
                                             onClick={() => setIsGapAnalysisExpanded(!isGapAnalysisExpanded)}
-                                            className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#1A365D]/5 to-[#2A4A7D]/5 rounded-lg border border-[#1A365D]/20 hover:bg-gradient-to-r hover:from-[#1A365D]/10 hover:to-[#2A4A7D]/10 transition-all"
+                                            className="w-full flex items-center justify-between p-4 bg-linear-to-r from-[#1A365D]/5 to-[#2A4A7D]/5 rounded-lg border border-[#1A365D]/20 hover:bg-linear-to-r hover:from-[#1A365D]/10 hover:to-[#2A4A7D]/10 transition-all"
                                         >
                                             <div className="flex items-center gap-2">
                                                 <Lightbulb className="h-5 w-5 text-[#D4AF37]" />
