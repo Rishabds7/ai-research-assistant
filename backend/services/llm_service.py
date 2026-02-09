@@ -838,6 +838,48 @@ Summaries:
 {combined}"""
         return clean_llm_summary(self._generate(prompt))
 
+    def analyze_swot(self, paper_context: str) -> str:
+        """
+        Generate SWOT analysis for a research paper.
+        
+        Args:
+            paper_context: Full text or key sections of the paper.
+            
+        Returns:
+            str: Markdown-formatted SWOT analysis.
+        """
+        prompt = f"""Analyze this research paper and provide a comprehensive SWOT analysis.
+
+Format your response as markdown with the following structure:
+
+## Strengths (Internal)
+- Unique methodology, strong data, clear arguments, novel findings
+- [Add 3-5 specific bullet points]
+
+## Weaknesses (Internal)
+- Small sample size, limited scope, potential bias, incomplete literature review
+- [Add 3-5 specific bullet points]
+
+## Opportunities (External)
+- Potential to advance a theory, applicability to industry, building on previous studies
+- [Add 3-5 specific bullet points]
+
+## Threats (External)
+- Similar competing research, rapid technological changes, conflicting findings, potential misinterpretation
+- [Add 3-5 specific bullet points]
+
+Paper Context:
+{paper_context[:4000]}
+
+Return ONLY the markdown SWOT analysis."""
+        
+        raw_analysis = self._generate(prompt)
+        if not raw_analysis:
+            logger.warning("SWOT analysis unavailable due to rate limit.")
+            return "SWOT analysis unavailable due to high AI traffic. Please try again later."
+        
+        return clean_llm_summary(raw_analysis)
+
 
 class OllamaLLMService:
     """
@@ -1165,6 +1207,49 @@ REQUIREMENTS:
 Summaries:
 {combined}"""
         return clean_llm_summary(self._generate(prompt))
+
+    def analyze_swot(self, paper_context: str) -> str:
+        """
+        Generate SWOT analysis for a research paper.
+        
+        Args:
+            paper_context: Full text or key sections of the paper.
+            
+        Returns:
+            str: Markdown-formatted SWOT analysis.
+        """
+        prompt = f"""Analyze this research paper and provide a comprehensive SWOT analysis.
+
+Format your response as markdown with the following structure:
+
+## Strengths (Internal)
+- List internal strengths: unique methodology, strong data, clear arguments, novel findings
+- Provide 3-5 specific bullet points
+
+## Weaknesses (Internal)
+- List internal weaknesses: small sample size, limited scope, potential bias, incomplete literature review
+- Provide 3-5 specific bullet points
+
+## Opportunities (External)
+- List external opportunities: potential to advance theory, industry applicability, building on studies
+- Provide 3-5 specific bullet points
+
+## Threats (External)
+- List external threats: competing research, tech changes, conflicting findings, misinterpretation risk
+- Provide 3-5 specific bullet points
+
+Paper Context:
+{paper_context[:4000]}
+
+Return ONLY the markdown SWOT analysis using • for bullets."""
+        
+        result = self._generate(prompt)
+        if not result or not result.strip():
+            logger.warning(f"Ollama SWOT analysis returned empty response")
+            return f"SWOT analysis unavailable. The AI model returned an empty response. Please ensure Ollama is running at {self.host} and the model '{self.model}' is available."
+        
+        logger.info("SWOT analysis completed successfully")
+        return clean_llm_summary(result)
 
 
 class LLMService:
