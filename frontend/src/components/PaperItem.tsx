@@ -3,7 +3,9 @@ import { Paper, extractAllSections, deletePaper, extractMetadata, getMediaUrl, g
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useTaskPoll } from '@/hooks/useTaskPoll';
-import { Loader2, FileText, CheckCircle2, Trash2, ChevronDown, ChevronRight, Database, Award, List, Eye, X, Download, FolderPlus } from 'lucide-react';
+import { Loader2, FileText, CheckCircle2, Trash2, ChevronDown, ChevronRight, Database, Award, List, Eye, X, Download, FolderPlus, Copy, Check } from 'lucide-react';
+import { Modal } from "@/components/ui/modal";
+import { Textarea } from "@/components/ui/textarea";
 import {
     Select,
     SelectContent,
@@ -44,6 +46,12 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [collections, setCollections] = useState<Collection[]>([]);
     const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
     const [addingToCollection, setAddingToCollection] = useState(false);
+
+    // Citation Modal State
+    const [showCitationModal, setShowCitationModal] = useState(false);
+    const [bibTexContent, setBibTexContent] = useState("");
+    const [isFetchingBibTex, setIsFetchingBibTex] = useState(false);
+    const [hasCopied, setHasCopied] = useState(false);
 
     // Refs for scroll-to functionality
     const summaryRef = useRef<HTMLDivElement>(null);
@@ -190,22 +198,43 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         }
     };
 
-    const handleExportBibtex = async () => {
-        try {
-            const data = await getBibTeX(paper.id);
-            const blob = new Blob([data.bibtex], { type: 'text/plain' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${paper.filename.split('.')[0]}.bib`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        } catch (e) {
-            console.error(e);
-            alert('Failed to generate BibTeX');
+    const handleOpenCitationModal = async () => {
+        setShowCitationModal(true);
+        if (!bibTexContent) {
+            setIsFetchingBibTex(true);
+            try {
+                const data = await getBibTeX(paper.id);
+                setBibTexContent(data.bibtex);
+            } catch (e) {
+                console.error(e);
+                alert('Failed to generate BibTeX');
+                setShowCitationModal(false);
+            } finally {
+                setIsFetchingBibTex(false);
+            }
         }
+    };
+
+    const handleCopyBibTex = async () => {
+        try {
+            await navigator.clipboard.writeText(bibTexContent);
+            setHasCopied(true);
+            setTimeout(() => setHasCopied(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+        }
+    };
+
+    const handleDownloadBibTex = () => {
+        const blob = new Blob([bibTexContent], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${paper.filename.split('.')[0]}.bib`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
     };
 
     const handleAddToCollection = async (collectionId: string) => {
@@ -357,7 +386,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                     variant="ghost"
                                     size="sm"
                                     className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
-                                    onClick={handleExportBibtex}
+                                    onClick={handleOpenCitationModal}
                                 >
                                     <Download className="h-3.5 w-3.5" />
                                     Cite
@@ -678,6 +707,57 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     </div>
                 )}
             </CardContent>
+
+            <Modal
+                isOpen={showCitationModal}
+                onClose={() => setShowCitationModal(false)}
+                title={`Cite "${paper.title || paper.filename}"`}
+                footer={
+                    <>
+                        <Button
+                            variant="outline"
+                            className="border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-xl"
+                            onClick={handleCopyBibTex}
+                            disabled={!bibTexContent}
+                        >
+                            {hasCopied ? (
+                                <>
+                                    <Check className="mr-2 h-4 w-4" />
+                                    Copied!
+                                </>
+                            ) : (
+                                <>
+                                    <Copy className="mr-2 h-4 w-4" />
+                                    Copy to Clipboard
+                                </>
+                            )}
+                        </Button>
+                        <Button
+                            className="bg-[#1A365D] hover:bg-[#2C5282] text-white px-6 rounded-xl"
+                            onClick={handleDownloadBibTex}
+                            disabled={!bibTexContent}
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download .bib
+                        </Button>
+                    </>
+                }
+            >
+                <div className="py-2">
+                    {isFetchingBibTex ? (
+                        <div className="flex flex-col items-center justify-center py-10 gap-4 text-slate-400">
+                            <Loader2 className="h-8 w-8 animate-spin text-[#D4AF37]" />
+                            <p className="text-sm font-medium">Generating BibTeX citation...</p>
+                        </div>
+                    ) : (
+                        <Textarea
+                            value={bibTexContent}
+                            readOnly
+                            className="min-h-[200px] font-mono text-xs bg-slate-50 border-slate-200 focus-visible:ring-[#D4AF37]"
+                        />
+                    )}
+                </div>
+            </Modal>
         </Card >
     );
 }
