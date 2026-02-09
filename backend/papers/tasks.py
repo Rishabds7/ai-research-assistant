@@ -78,240 +78,380 @@ def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
     INITIAL INGESTION PIPELINE (Stage 1).
     Configured with retries for resilience on platforms like Render Free Tier.
     
-    Args:
-        paper_id: UUID of the Paper to process.
+    Steps:
+    1. PDF -> Raw Text (PyMuPDF).
+    2. Text -> Sections (Heuristic Parsing).
+    3. Embeddings (COMING SOON).
+    
+     Args:
+        paper_id: UUID of the Paper record.
         
     Returns:
-        Dict: Status and paper_id on success.
+        Dict: Status or error message.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
     
     try:
-        logger.info(f"Starting PDF processing for Paper {paper_id}")
         paper = Paper.objects.get(id=paper_id)
-        
-        # 1. Process PDF using our custom segmentation logic
-        logger.info(f"Extracting text from {paper.filename}...")
         processor = PDFProcessor()
-        data = processor.process_pdf(paper.file.path, str(paper.id))
         
-        paper.full_text = sanitize_text(data['full_text'])
-        paper.sections = sanitize_text(data['sections'])
-        paper.processed = True
-        paper.save(update_fields=['full_text', 'sections', 'processed'])
-        logger.info("Basic text extraction successful. Paper marked as processed.")
-
-        # 2. Metadata Extraction (Optional, don't fail the whole task if this errors)
+        # Extract Text
+        text = processor.extract_text(paper.file.path)
+        if not text or len(text.strip()) < 100:
+            error_msg = 'Failed to extract meaningful text from PDF.'
+            update_task_status(task_id, 'failed', error=error_msg)
+            return {'error': error_msg}
+        
+        # Extract Paper Metadata (Title, Authors, Year) using LLM
         try:
-            logger.info("Calling Gemini for metadata extraction...")
             llm = LLMService()
-            # Send just the first 10k chars for metadata (fast)
-            info = llm.extract_paper_info(paper.full_text[:10000])
+            metadata_context = text[:6000]  # First 6K chars for title/authors extraction
             
-            paper.title = sanitize_text(info.get('title', paper.filename))
-            paper.year = sanitize_text(info.get('year', 'Unknown'))
-            paper.journal = sanitize_text(info.get('journal', 'Unknown'))
+            # Use generic LLM prompt to extract title/authors/year
+            metadata_prompt = f"""Extract the following metadata from this research paper:
+- Title (exact title)
+- Authors (comma-separated list of author names)
+- Year (publication year, return "Unknown" if not found)
+- Journal (publication venue or "Unknown" if not found)
+
+Paper text:
+{metadata_context}
+
+Return ONLY valid JSON:
+{{
+  "title": "exact paper title",
+  "authors": ["Author One", "Author Two"],
+  "year": "2024",
+  "journal": "Journal Name"
+}}"""
             
-            authors_data = info.get('authors', 'Unknown')
-            if isinstance(authors_data, list):
-                paper.authors = json.dumps(authors_data)
+            # Use the backend's _generate method directly for this custom prompt
+            if hasattr(llm.backend, '_generate_with_retry'):
+                # Gemini
+                response = llm.backend._generate_with_retry(metadata_prompt)
+                from services.llm_service import _get_response_text, _parse_json_safe
+                response_text = _get_response_text(response)
+                metadata = _parse_json_safe(response_text, {
+                    'title': paper.filename,
+                    'authors': [],
+                    'year': 'Unknown',
+                    'journal': 'Unknown'
+                })
+            elif hasattr(llm.backend, '_generate'):
+                # Ollama
+                response_text = llm.backend._generate(metadata_prompt, json_mode=True)
+                from services.llm_service import _parse_json_safe
+                metadata = _parse_json_safe(response_text, {
+                    'title': paper.filename,
+                    'authors': [],
+                    'year': 'Unknown',
+                    'journal': 'Unknown'
+                })
             else:
-                paper.authors = sanitize_text(authors_data)
-            paper.save(update_fields=['title', 'authors', 'year', 'journal'])
-            logger.info(f"Metadata identified: {paper.title} ({paper.year})")
-        except Exception as e:
-            logger.error(f"Metadata extraction failed (non-fatal): {e}")
-            # Ensure we have at least a title
-            if not paper.title:
-                paper.title = paper.filename
-                paper.save(update_fields=['title'])
+                # Fallback
+                metadata = {
+                    'title': paper.filename,
+                    'authors': [],
+                    'year': 'Unknown',
+                    'journal': 'Unknown'
+                }
             
-        update_task_status(task_id, 'completed', result={"paper_id": str(paper.id)})
+            # Clean and store metadata
+            paper.title = sanitize_text(metadata.get('title', paper.filename) or paper.filename)
+            paper.authors = json.dumps(metadata.get('authors', [])) if isinstance(metadata.get('authors'), list) else str(metadata.get('authors', ''))
+            paper.year = sanitize_text(metadata.get('year', 'Unknown'))
+            paper.journal = sanitize_text(metadata.get('journal', 'Unknown'))
+            
+        except Exception as metadata_error:
+            logger.warning(f"Failed to extract metadata for paper {paper_id}: {metadata_error}")
+            paper.title = paper.filename
+            paper.authors = json.dumps([])
+            paper.year = 'Unknown'
+            paper.journal = 'Unknown'
         
-        # 3. Trigger Embeddings in a separate background task (Lower Priority / Non-Blocking)
-        generate_embeddings_task.delay(str(paper.id))
+        # Split into Sections
+        sections = processor.split_into_sections(text)
         
-        logger.info(f"Task {task_id} completed successfully. Embeddings triggered.")
-        return {"status": "success", "paper_id": str(paper.id)}
+        # Save
+        paper.full_text = sanitize_text(text)
+        paper.sections = sanitize_text(sections)
+        paper.processed = True
+        paper.save()
         
+        # Generate Embeddings  
+        embedding_service = EmbeddingService()
+        try:
+            embedding_service.generate_paper_embeddings(paper)
+        except Exception as embed_error:
+            logger.warning(f"Embedding generation failed for paper {paper_id}: {embed_error}")
+        
+        update_task_status(task_id, 'completed', result={'message': 'PDF processed successfully'})
+        return {'message': 'PDF processed'}
+        
+    except Paper.DoesNotExist:
+        error_msg = f'Paper {paper_id} does not exist.'
+        update_task_status(task_id, 'failed', error=error_msg)
+        return {'error': error_msg}
     except Exception as e:
-        logger.error(f"FATAL Task Error {task_id}: {e}")
+        logger.error(f"PDF processing error for {paper_id}: {e}")
         update_task_status(task_id, 'failed', error=str(e))
         raise
 
-@shared_task(bind=True)
-def generate_embeddings_task(self, paper_id: str) -> None:
-    """
-    NON-BLOCKING TASK: Generate semantic vectors for RAG search.
-    This runs after the paper is already 'Ready' in the UI.
-    
-    Args:
-        paper_id: UUID of the Paper.
-    """
-    try:
-        paper = Paper.objects.get(id=paper_id)
-        logger.info(f"Generating embeddings for {paper.filename}...")
-        embed_service = EmbeddingService()
-        embed_service.store_embeddings(paper, paper.sections)
-        logger.info("Embeddings complete.")
-    except Exception as e:
-        logger.error(f"Embeddings failed: {e}")
-
-@shared_task(bind=True)
+@shared_task(bind=True, max_retries=2, default_retry_delay=5)
 def extract_methodology_task(self, paper_id: str) -> Dict[str, Any]:
     """
-    TECHNICAL DEEP-DIVE TASK (Stage 2).
-    
-    Focuses specifically on the technical stack of the paper.
-    If a clear 'Methodology' section isn't found, it uses 'Smart-RAG' 
-    (semantic search) to gather text related to experiments and math.
+    EXTRACT TECHNICAL METHODOLOGY (Stage 2).
+    This task is triggered by the user clicking the 'Methodology' button.
+    It uses the LLM to analyze the 'Methodology' section and extract structured data.
     
     Args:
         paper_id: UUID of the Paper.
         
     Returns:
-        Dict: Extracted methodology data.
+        Dict: Methodology fields or error message.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
     
     try:
         paper = Paper.objects.get(id=paper_id)
-        sections_lower = {k.lower(): v for k,v in paper.sections.items()}
+        if not paper.processed:
+            error_msg = 'Paper must be processed first.'
+            update_task_status(task_id, 'failed', error=error_msg)
+            return {'error': error_msg}
         
-        # Context Selection: Methodology -> Methods -> RAG Fallback
-        context = sections_lower.get('methodology') or sections_lower.get('method')
+        sections = paper.sections or {}
+        sections_lower = {k.lower(): v for k, v in sections.items()}
         
-        if not context:
-            embed_svc = EmbeddingService()
-            results = embed_svc.search("methodology method experimental setup architecture", k=5)
-            # Use chunks only from this specific paper
-            paper_results = [r for r in results if r['paper_id'] == str(paper.id)]
-            context = "\n".join([r['text'] for r in paper_results]) if paper_results else paper.full_text[:12000]
-                 
+        # Look for methodology-related sections
+        methodology_text = (
+            sections_lower.get('methodology', '') or
+            sections_lower.get('methods', '') or
+            sections_lower.get('approach', '') or
+            sections_lower.get('experimental setup', '')
+        )[:5000]  # Limit context window
+        
+        if not methodology_text:
+            error_msg = 'No methodology section found in paper. Try processing the PDF again.'
+            update_task_status(task_id, 'failed', error=error_msg)
+            return {'error': error_msg}
+        
         llm = LLMService()
-        data = llm.extract_methodology(context)
+        result = llm.extract_methodology(methodology_text)
         
-        Methodology.objects.update_or_create(
+        # Delete old methodology if it exists
+        Methodology.objects.filter(paper=paper).delete()
+        
+        # Save new methodology
+        methodology = Methodology.objects.create(
             paper=paper,
-            defaults={
-                'datasets': data.get('datasets', []),
-                'model': data.get('model', {}),
-                'metrics': data.get('metrics', []),
-                'results': data.get('results', {}),
-                'summary': data.get('summary', '')
-            }
+            datasets=sanitize_text(result['datasets']),
+            model=sanitize_text(result['model']),
+            metrics=sanitize_text(result['metrics']),
+            results=sanitize_text(result['results']),
+            summary=sanitize_text(result['summary'])
         )
-        update_task_status(task_id, 'completed', result=data)
-        return data
+        
+        # Mark flag
+        paper.methodology_status = True
+        paper.save(update_fields=['methodology_status'])
+        
+        update_task_status(task_id, 'completed', result={'methodology_id': str(methodology.id)})
+        return {'methodology_id': str(methodology.id)}
+        
+    except Paper.DoesNotExist:
+        error_msg = f'Paper {paper_id} does not exist.'
+        update_task_status(task_id, 'failed', error=error_msg)
+        return {'error': error_msg}
     except Exception as e:
+        logger.error(f"Methodology extraction error for {paper_id}: {e}")
         update_task_status(task_id, 'failed', error=str(e))
         raise
 
-@shared_task(bind=True)
+@shared_task(bind=True, max_retries=2, default_retry_delay=5)
 def extract_all_sections_task(self, paper_id: str) -> Dict[str, str]:
     """
-    HIERARCHICAL SUMMARIZATION TASK (Stage 2).
-    
-    1. Summarizes individual logical sections (Abstract, Intro, etc.).
-    2. Uses those summaries to generate a 'Global Summary' (Multi-stage synthesis).
+    SECTION-BY-SECTION SUMMARIZATION (Stage 3).
+    Triggered when the user clicks 'Summary'. 
+    Uses the LLM to create bullet-point summaries of Abstract, Intro, etc.
     
     Args:
         paper_id: UUID of the Paper.
         
     Returns:
-        Dict: Map of section names to summaries.
+        Dict: Confirmation or error message.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
     
     try:
         paper = Paper.objects.get(id=paper_id)
+        if not paper.processed:
+            error_msg = 'Paper not processed yet.'
+            update_task_status(task_id, 'failed', error=error_msg)
+            return {'error': error_msg}
+        
+        sections = paper.sections or {}
         llm = LLMService()
+        summaries_dict = llm.summarize_sections(sections)
         
-        # Intelligent summarization based on paper structure
-        summaries = llm.summarize_sections(paper.sections, paper.full_text)
-        
-        # Persistence: save individual section summaries for the side-by-side view
+        # Delete existing section summaries
         SectionSummary.objects.filter(paper=paper).delete()
-        SectionSummary.objects.bulk_create([
-            SectionSummary(paper=paper, section_name=name, summary=sanitize_text(text), order_index=i)
-            for i, (name, text) in enumerate(summaries.items())
-        ])
-
-        # Global Synthesis: provide the TL;DR for the dashboard
-        logger.info(f"Generating global summary for paper {paper.id} from {len(summaries)} sections")
-        global_sum = llm.generate_global_summary(summaries)
         
-        if not global_sum and summaries:
-            logger.warning(f"Global summary for {paper.id} returned empty. Using first 5 section points as fallback.")
-            # Fallback: Take the first point of each section summary
-            fallback_points = []
-            for s_name, s_text in list(summaries.items())[:5]:
-                first_line = s_text.split('\n')[0].strip()
-                if first_line:
-                    fallback_points.append(f"{s_name}: {first_line}")
-            global_sum = "\n".join(fallback_points)
+        # Create new section summaries
+        for idx, (section_name, summary_text) in enumerate(summaries_dict.items()):
+            SectionSummary.objects.create(
+                paper=paper,
+                section_name=sanitize_text(section_name),
+                summary=sanitize_text(summary_text),
+                order_index=idx
+            )
+        
+        # Generate Global Summary
+        try:
+            full_context = '\n\n'.join([
+                f"**{section_name}:**\n{summary_text}"
+                for section_name, summary_text in summaries_dict.items()
+            ])[:4000]
             
-        paper.global_summary = sanitize_text(global_sum)
-        paper.save(update_fields=['global_summary'])
+            global_summary_prompt = f"""Based on these section summaries, create a concise TL;DR (2-3 sentences) of the entire paper.
+
+{full_context}
+
+Return ONLY the TL;DR summary:"""
+            
+            if hasattr(llm.backend, '_generate_with_retry'):
+                # Gemini
+                response = llm.backend._generate_with_retry(global_summary_prompt)
+                from services.llm_service import _get_response_text
+                global_summary = _get_response_text(response)
+            elif hasattr(llm.backend, '_generate'):
+                # Ollama
+                global_summary = llm.backend._generate(global_summary_prompt, json_mode=False)
+            else:
+                global_summary = "Summary not available"
+            
+            paper.global_summary = sanitize_text(global_summary)
+            paper.save(update_fields=['global_summary'])
+            
+        except Exception as summary_error:
+            logger.warning(f"Failed to generate global summary for paper {paper_id}: {summary_error}")
         
-        update_task_status(task_id, 'completed', result=summaries)
-        return summaries
+        update_task_status(task_id, 'completed', result={'message': 'Sections summarized'})
+        return {'message': 'Sections summarized'}
+        
+    except Paper.DoesNotExist:
+        error_msg = f'Paper {paper_id} does not exist.'
+        update_task_status(task_id, 'failed', error=error_msg)
+        return {'error': error_msg}
     except Exception as e:
+        logger.error(f"Section summarization error for {paper_id}: {e}")
         update_task_status(task_id, 'failed', error=str(e))
         raise
 
-@shared_task(bind=True)
+@shared_task(bind=True, max_retries=2, default_retry_delay=5)
 def extract_metadata_task(self, paper_id: str, field: str) -> Dict[str, Any]:
     """
-    TARGETED EXTRACTION TASK (Ad-hoc).
-    
-    Triggers when the user requests specific tags like 'Datasets' or 'Licenses'.
-    Study the 'Context Selection Logic' here—it's a great example of 
-    handling token limits by intelligently cropping the paper text.
+    TARGETED METADATA EXTRACTION (Datasets, Licenses).
+    This is called when the user clicks 'Datasets' or 'Licenses'.
+    Uses SMART CONTEXT CROPPING to reduce LLM costs.
     
     Args:
         paper_id: UUID of the Paper.
-        field: The metadata field to extract (e.g., 'datasets', 'licenses').
+        field: 'datasets' or 'licenses'.
         
     Returns:
-        Dict: Extracted metadata for the field.
+        Dict: Extracted data or error message.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
     
     try:
         paper = Paper.objects.get(id=paper_id)
+        if not paper.processed:
+            error_msg = 'Paper not processed yet.'
+            update_task_status(task_id, 'failed', error=error_msg)
+            return {'error': error_msg}
+        
+        # CONTEXT WINDOW OPTIMIZATION STRATEGY
+        sections = paper.sections or {}
+        sections_lower = {k.lower(): v for k, v in sections.items()}
+        
+        # Build context from high-density sections
+        context_parts = []
+        for section_key in ['abstract', 'introduction', 'methodology', 'methods', 'experiments', 'experimental setup']:
+            if section_key in sections_lower and sections_lower[section_key]:
+                context_parts.append(sections_lower[section_key][:2000])
+        
+        context = '\n\n'.join(context_parts)[:5000]
+        
+        if not context:
+            context = paper.full_text[:5000] if paper.full_text else ''
+        
+        if not context:
+            error_msg = f'No meaningful text to extract {field}.'
+            update_task_status(task_id, 'failed', error=error_msg)
+            return {'error': error_msg}
+        
         llm = LLMService()
         
-        # SMART CONTEXT SELECTION:
-        # We only send high-density areas (Intro + targeted keywords) to the LLM.
         if field == 'datasets':
-            dataset_keywords = ["dataset", "benchmark", "evaluation", "setup", "metrics"]
-            target_sections = [content for name, content in paper.sections.items() 
-                             if any(k in name.lower() for k in dataset_keywords)]
-            context = paper.full_text[:12000] + "\n\n" + "\n\n".join(target_sections)[:30000]
-            result = llm.extract_datasets(context)
+            prompt = f"""List all datasets mentioned in this research paper.
+Return ONLY a JSON array of dataset names. If none found, return ["None mentioned"].
+
+Paper text:
+{context}
+
+Return format: ["dataset1", "dataset2"]"""
         elif field == 'licenses':
-            # Pass full text to service - it uses smart snippet extraction (Head 20k + Tail 40k)
-            result = llm.extract_licenses(paper.full_text)
+            prompt = f"""List all software licenses mentioned in this research paper.
+Return ONLY a JSON array of license names. If none found, return ["None mentioned"].
+
+Paper text:
+{context}
+
+Return format: ["license1", "license2"]"""
         else:
-            raise ValueError(f"Unknown field: {field}")
-            
-        meta = paper.metadata.copy() if paper.metadata else {}
-        meta[field] = result
-        paper.metadata = meta
-        paper.save(update_fields=['metadata', 'task_ids'])
+            error_msg = f'Invalid field: {field}'
+            update_task_status(task_id, 'failed', error=error_msg)
+            return {'error': error_msg}
+        
+        # Execute LLM call
+        if hasattr(llm.backend, '_generate_with_retry'):
+            # Gemini
+            response = llm.backend._generate_with_retry(prompt)
+            from services.llm_service import _get_response_text, _parse_json_safe
+            response_text = _get_response_text(response)
+            result = _parse_json_safe(response_text, ["None mentioned"])
+        elif hasattr(llm.backend, '_generate'):
+            # Ollama
+            response_text = llm.backend._generate(prompt, json_mode=True)
+            from services.llm_service import _parse_json_safe
+            result = _parse_json_safe(response_text, ["None mentioned"])
+        else:
+            result = ["None mentioned"]
+        
+        if not isinstance(result, list):
+            result = ["None mentioned"]
+        
+        # Save to metadata
+        paper.metadata[field] = sanitize_text(result)
+        paper.save(update_fields=['metadata'])
         
         update_task_status(task_id, 'completed', result={field: result})
         return {field: result}
+        
+    except Paper.DoesNotExist:
+        error_msg = f'Paper {paper_id} does not exist.'
+        update_task_status(task_id, 'failed', error=error_msg)
+        return {'error': error_msg}
     except Exception as e:
+        logger.error(f"Metadata extraction error for {paper_id}/{field}: {e}")
         update_task_status(task_id, 'failed', error=str(e))
         raise
 
-@shared_task(bind=True)
+@shared_task(bind=True, max_retries=2, default_retry_delay=5)
 def analyze_collection_gaps_task(self, collection_id: str) -> Dict[str, str]:
     """
     MULTI-PAPER RESEARCH GAP ANALYSIS (Map-Reduce Pattern).
@@ -384,6 +524,71 @@ def analyze_collection_gaps_task(self, collection_id: str) -> Dict[str, str]:
         return {'gap_analysis': gap_analysis}
         
     except Exception as e:
-        logger.error(f"Gap analysis task {task_id} failed: {e}")
-        update_task_status(task_id, 'failed', error=str(e))
-        raise
+        logger.error(f"Gap analysis error for collection {collection_id}: {e}")
+        error_msg = str(e)
+        update_task_status(task_id, 'failed', error=error_msg)
+        return {'error': error_msg}
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=5)
+def analyze_swot_task(self, paper_id: str) -> Dict[str, str]:
+    """
+    SWOT ANALYSIS FOR INDIVIDUAL PAPERS.
+    
+    Analyzes a single paper to identify Strengths, Weaknesses, Opportunities, and Threats.
+    Provides researchers with a structured framework to evaluate research papers.
+    
+    Args:
+        paper_id: UUID of the Paper.
+        
+    Returns:
+        Dict: SWOT analysis result.
+    """
+    task_id = self.request.id
+    update_task_status(task_id, 'running')
+    
+    try:
+        from django.utils import timezone
+        
+        paper = Paper.objects.get(id=paper_id)
+        if not paper.processed:
+            error_msg = 'Paper not processed yet.'
+            update_task_status(task_id, 'failed', error=error_msg)
+            return {'error': error_msg}
+        
+        # Build context from key sections
+        sections = paper.sections or {}
+        sections_lower = {k.lower(): v for k, v in sections.items()}
+        
+        context_parts = [
+            f"**Title:** {paper.title or paper.filename}",
+            f"**Authors:** {paper.authors}",
+        ]
+        
+        # Add key sections
+        for section_key in ['abstract', 'introduction', 'methodology', 'methods', 'conclusion', 'results']:
+            if section_key in sections_lower and sections_lower[section_key]:
+                context_parts.append(f"**{section_key.title()}:**\n{sections_lower[section_key][:2000]}")
+        
+        paper_context = '\n\n'.join(context_parts)
+        
+        # Call LLM
+        llm = LLMService()
+        swot_analysis = llm.analyze_swot(paper_context)
+        
+        # Save to paper
+        paper.swot_analysis = sanitize_text(swot_analysis)
+        paper.swot_analysis_updated_at = timezone.now()
+        paper.save(update_fields=['swot_analysis', 'swot_analysis_updated_at'])
+        
+        update_task_status(task_id, 'completed', result={'swot_analysis': swot_analysis})
+        return {'swot_analysis': swot_analysis}
+        
+    except Paper.DoesNotExist:
+        error_msg = f'Paper {paper_id} does not exist.'
+        update_task_status(task_id, 'failed', error=error_msg)
+        return {'error': error_msg}
+    except Exception as e:
+        logger.error(f"SWOT analysis error for paper {paper_id}: {e}")
+        error_msg = str(e)
+        update_task_status(task_id, 'failed', error=error_msg)
+        return {'error': error_msg}

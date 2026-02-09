@@ -4,7 +4,7 @@ Project: Research Assistant
 File: backend/services/pdf_processor.py
 
 This service is the 'engine' for initial data extraction.
-It uses PyMuPDF (fitz) to:
+It uses PyMuPDF (fitz) or pypdf to:
 1. Load PDF files from disk.
 2. Extract clean text from pages (handling multi-column layouts).
 3. Use Regex and heuristics to detect the structural components (Abstract, Intro, Methods, etc.).
@@ -15,7 +15,6 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
-import fitz
 
 class PDFProcessor:
     """
@@ -67,7 +66,7 @@ class PDFProcessor:
 
     def extract_text(self, pdf_path: Union[Path, str]) -> str:
         """
-        Extract all text from a PDF using PyMuPDF.
+        Extract all text from a PDF using PyMuPDF with pypdf fallback.
 
         Args:
             pdf_path: Path to the PDF file.
@@ -82,26 +81,36 @@ class PDFProcessor:
         if not path.exists():
             raise ValueError(f"PDF file not found: {path}")
 
+        # Attempt extraction with PyMuPDF (fitz)
         try:
+            import fitz
             doc = fitz.open(path)
-        except Exception as e:
-            raise ValueError(f"Could not open PDF: {e}") from e
-
-        try:
             text_parts: List[str] = []
             for page in doc:
-                # Use sort=True to better handle multi-column layouts
                 text_parts.append(page.get_text("text", sort=True))
             doc.close()
+            full_text = "\n".join(text_parts).strip()
+            if full_text:
+                return full_text
+        except (ImportError, Exception):
+            # Fallback to pypdf if PyMuPDF fails or is missing
+            pass
+
+        # Fallback to pypdf
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(path)
+            text_parts = []
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    text_parts.append(text)
             full_text = "\n".join(text_parts).strip()
             if not full_text:
                 raise ValueError("PDF contains no extractable text")
             return full_text
-        except ValueError:
-            raise
         except Exception as e:
-            doc.close()
-            raise ValueError(f"Error extracting text: {e}") from e
+            raise ValueError(f"Error extracting text with pypdf: {e}") from e
 
     def detect_sections(self, text: str) -> Dict[str, str]:
         """

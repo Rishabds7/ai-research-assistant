@@ -13,11 +13,8 @@ celery==5.3.6
 redis==5.0.1
 django-celery-results==2.5.1
 
-# PDF Processing
-PyMuPDF==1.26.7
+# PDF Processing (pypdf only for local Python 3.13)
 pypdf==6.7.0
-
-# Embeddings & ML moved to Google Cloud API
 
 # LLM Integration
 google-generativeai==0.7.2

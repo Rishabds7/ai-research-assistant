@@ -330,6 +330,47 @@ Return a bullet-point summary:"""
                 summaries[section_name] = "Error generating summary"
         return summaries
 
+    def analyze_swot(self, paper_context: str) -> str:
+        """
+        Generate SWOT analysis for a research paper.
+        
+        Args:
+            paper_context: Full text or key sections of the paper
+            
+        Returns:
+            Markdown-formatted SWOT analysis
+        """
+        prompt = f"""Analyze this research paper and provide a comprehensive SWOT analysis.
+
+Format your response as markdown with the following structure:
+
+## Strengths (Internal)
+- Unique methodology, strong data, clear arguments, novel findings
+- [Add 3-5 specific bullet points]
+
+## Weaknesses (Internal)
+- Small sample size, limited scope, potential bias, incomplete literature review
+- [Add 3-5 specific bullet points]
+
+## Opportunities (External)
+- Potential to advance a theory, applicability to industry, building on previous studies
+- [Add 3-5 specific bullet points]
+
+## Threats (External)
+- Similar competing research, rapid technological changes, conflicting findings, potential misinterpretation
+- [Add 3-5 specific bullet points]
+
+Paper Context:
+{paper_context[:4000]}
+
+Return ONLY the markdown SWOT analysis."""
+        try:
+            response = self._generate_with_retry(prompt)
+            text = _get_response_text(response)
+            return text if text else "SWOT analysis not available"
+        except Exception as e:
+            raise ValueError(f"SWOT analysis failed: {e}") from e
+
 
 # --- Ollama Implementation ---
 
@@ -491,6 +532,46 @@ Return a bullet-point summary (use • for bullets):"""
                 summaries[section_name] = "Error generating summary"
         return summaries
 
+    def analyze_swot(self, paper_context: str) -> str:
+        """
+        Generate SWOT analysis for a research paper.
+        
+        Args:
+            paper_context: Full text or key sections of the paper
+            
+        Returns:
+            Markdown-formatted SWOT analysis
+        """
+        prompt = f"""Analyze this research paper and provide a comprehensive SWOT analysis.
+
+Format your response as markdown with the following structure:
+
+## Strengths (Internal)
+- List internal strengths: unique methodology, strong data, clear arguments, novel findings
+- Provide 3-5 specific bullet points
+
+## Weaknesses (Internal)
+- List internal weaknesses: small sample size, limited scope, potential bias, incomplete literature review
+- Provide 3-5 specific bullet points
+
+## Opportunities (External)
+- List external opportunities: potential to advance theory, industry applicability, building on studies
+- Provide 3-5 specific bullet points
+
+## Threats (External)
+- List external threats: competing research, tech changes, conflicting findings, misinterpretation risk
+- Provide 3-5 specific bullet points
+
+Paper Context:
+{paper_context[:4000]}
+
+Return ONLY the markdown SWOT analysis using • for bullets."""
+        try:
+            text = self._generate(prompt, json_mode=False)
+            return text if text else "SWOT analysis not available"
+        except Exception as e:
+            raise ValueError(f"SWOT analysis failed: {e}") from e
+
 
 # --- Factory ---
 
@@ -513,3 +594,6 @@ class LLMService:
 
     def summarize_sections(self, sections: dict[str, str]) -> dict[str, str]:
         return self.backend.summarize_sections(sections)
+
+    def analyze_swot(self, paper_context: str) -> str:
+        return self.backend.analyze_swot(paper_context)

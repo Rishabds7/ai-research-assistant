@@ -81,6 +81,8 @@ export interface Paper {
     journal?: string;
     notes?: string;
     global_summary?: string;
+    swot_analysis?: string;
+    swot_analysis_updated_at?: string;
 }
 
 export interface Methodology {
@@ -230,6 +232,11 @@ export const deleteAllCollections = async (): Promise<void> => {
  */
 export const analyzeCollectionGaps = async (collectionId: string): Promise<TaskByIdResponse> => {
     const response = await api.post<TaskByIdResponse>(`/collections/${collectionId}/analyze_gaps/`);
+    return response.data;
+};
+
+export const analyzeSwot = async (id: string): Promise<TaskByIdResponse> => {
+    const response = await api.post<TaskByIdResponse>(`/papers/${id}/analyze_swot/`);
     return response.data;
 };
 

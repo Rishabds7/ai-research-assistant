@@ -71,6 +71,10 @@ class Paper(models.Model):
     # Global Summary is the 'TL;DR' table-level summary for the Review tab
     global_summary = models.TextField(blank=True)
     
+    # SWOT Analysis (NEW FEATURE)
+    swot_analysis = models.TextField(blank=True)
+    swot_analysis_updated_at = models.DateTimeField(null=True, blank=True)
+    
     class Meta:
         ordering = ['-uploaded_at']
     

@@ -105,7 +105,7 @@ class PaperListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Paper
-        fields = ['id', 'filename', 'file', 'uploaded_at', 'processed', 'methodology', 'section_summaries', 'metadata', 'task_ids', 'title', 'authors', 'notes', 'global_summary']
+        fields = ['id', 'filename', 'file', 'uploaded_at', 'processed', 'methodology', 'section_summaries', 'metadata', 'task_ids', 'title', 'authors', 'notes', 'global_summary', 'swot_analysis', 'swot_analysis_updated_at']
     
     def get_authors(self, obj: Paper) -> str:
         """
@@ -167,7 +167,7 @@ class PaperDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Paper
-        fields = ['id', 'filename', 'file', 'uploaded_at', 'processed', 'full_text', 'sections', 'methodology', 'section_summaries', 'metadata', 'task_ids', 'title', 'authors', 'notes', 'global_summary']
+        fields = ['id', 'filename', 'file', 'uploaded_at', 'processed', 'full_text', 'sections', 'methodology', 'section_summaries', 'metadata', 'task_ids', 'title', 'authors', 'notes', 'global_summary', 'swot_analysis', 'swot_analysis_updated_at']
         extra_kwargs = {
             'filename': {'read_only': True}
         }

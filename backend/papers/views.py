@@ -247,6 +247,46 @@ class PaperViewSet(viewsets.ModelViewSet):
         )
         return Response({'task_id': task.id})
 
+    @action(detail=True, methods=['post'])
+    def analyze_swot(self, request: Request, pk: Optional[str] = None) -> Response:
+        """
+        Triggers SWOT analysis for a single paper.
+        
+        Args:
+            request: HTTP Request.
+            pk: UUID of the paper.
+            
+        Returns:
+            Response: Task ID for polling.
+        """
+        paper = self.get_object()
+        if not paper.processed:
+            return Response({'error': 'Paper not processed yet'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if already running
+        existing_task_id = paper.task_ids.get('swot_analysis')
+        if existing_task_id:
+            try:
+                task_status = TaskStatus.objects.get(task_id=existing_task_id)
+                if task_status.status in ['pending', 'running']:
+                    return Response({'task_id': existing_task_id})
+            except TaskStatus.DoesNotExist:
+                pass
+        
+        from .tasks import analyze_swot_task
+        task = analyze_swot_task.delay(str(paper.id))
+        
+        # Persist task_id
+        paper.task_ids['swot_analysis'] = task.id
+        paper.save(update_fields=['task_ids'])
+        
+        TaskStatus.objects.create(
+            task_id=task.id,
+            task_type='analyze_swot',
+            status='pending'
+        )
+        return Response({'task_id': task.id})
+
     @action(detail=False, methods=['post'])
     def delete_all(self, request: Request) -> Response:
         """Delete all papers and associated data."""
