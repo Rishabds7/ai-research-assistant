@@ -393,7 +393,7 @@ class GeminiLLMService:
             prompt: The full prompt string.
             
         Returns:
-            str: The LLM's text response.
+            Optional[str]: The LLM's text response, or None if rate limited/failed.
         """
         max_retries = 3
         base_delay = 2
@@ -415,8 +415,13 @@ class GeminiLLMService:
                     time.sleep(delay)
                     continue
                 
-                logger.error(f"Gemini error: {e}")
-                return ""
+                # All retries exhausted
+                if is_429:
+                    logger.error(f"Gemini rate limit exhausted after {max_retries} retries. Returning None to trigger fallback.")
+                    return None  # Signal rate limit failure
+                else:
+                    logger.error(f"Gemini error: {e}")
+                    return None  # Signal general failure
 
     def extract_paper_info(self, context: str) -> Dict[str, str]:
         """
@@ -544,12 +549,14 @@ Analyze the following papers and provide:
 """
         
         logger.info("Starting gap analysis with Gemini LLM")
-        result = self._generate(prompt)
-        if not result or not result.strip():
-            logger.warning("Gemini LLM returned empty response for gap analysis")
-            return "Failed to generate gap analysis. The AI model returned an empty response. Please check your Gemini API key and try again."
-        logger.info("Gap analysis completed successfully")
-        return clean_llm_summary(result)
+        raw_analysis = self._generate(prompt)
+        
+        # Fallback if rate limited or empty
+        if not raw_analysis:
+             logger.warning("Rate limit or error during gap analysis. Returning empty string.")
+             return "Gap analysis unavailable due to high AI traffic. Please try again later."
+
+        return clean_llm_summary(raw_analysis)
 
     def extract_licenses(self, paper_text: str) -> List[str]:
         """
@@ -764,10 +771,17 @@ Content to summarize:
 {self._pre_clean_content(content)[:15000]}"""
             
             raw_summary = self._generate(prompt)
-            summaries[section_name] = clean_llm_summary(raw_summary)
+            
+            if raw_summary:
+                summaries[section_name] = clean_llm_summary(raw_summary)
+            else:
+                # Fallback: Rate limit hit. Use truncated content.
+                logger.warning(f"Rate limit hit for section '{section_name}'. Using fallback truncated text.")
+                fallback_text = content[:500].strip() + "..."
+                summaries[section_name] = f"[AI Summary Unavailable - Rate Limit]\n{fallback_text}"
             
             # Rate limiting: Sleep briefly to avoid hitting Gemini's RPM/TPM limits quickly
-            time.sleep(1)
+            time.sleep(2)
         
         return summaries
 
