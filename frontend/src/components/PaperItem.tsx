@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Paper, extractAllSections, deletePaper, extractMetadata, getMediaUrl, getBibTeX, Collection, getCollections, addPaperToCollection } from '@/lib/api';
+import { Paper, extractAllSections, deletePaper, extractMetadata, getMediaUrl, getBibTeX, Collection, getCollections, addPaperToCollection, analyzeSwot } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useTaskPoll } from '@/hooks/useTaskPoll';
@@ -32,6 +32,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [licensesTaskId, setLicensesTaskId] = useState<string | null>(
         (!paper.metadata?.licenses || paper.metadata.licenses.length === 0) ? (paper.task_ids?.licenses || null) : null
     );
+    const [swotTaskId, setSwotTaskId] = useState<string | null>(null);
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
     const [isSummariesVisible, setIsSummariesVisible] = useState(true);
     const [showPdf, setShowPdf] = useState(false);
@@ -41,8 +42,10 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [showLicenses, setShowLicenses] = useState(
         !!(paper.task_ids?.licenses || (paper.metadata?.licenses && paper.metadata.licenses.length > 0))
     );
+    const [showSwot, setShowSwot] = useState(!!paper.swot_analysis);
     const [isDsRequesting, setIsDsRequesting] = useState(false);
     const [isLicRequesting, setIsLicRequesting] = useState(false);
+    const [isSwotRequesting, setIsSwotRequesting] = useState(false);
     const [collections, setCollections] = useState<Collection[]>([]);
     const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
     const [addingToCollection, setAddingToCollection] = useState(false);
