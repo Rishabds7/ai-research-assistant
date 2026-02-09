@@ -386,7 +386,7 @@ class GeminiLLMService:
 
     def _generate(self, prompt: str) -> str:
         """
-        Low-level API call wrapper with basic error handling.
+        Low-level API call wrapper with exponential backoff for 429 errors.
         
         Args:
             prompt: The full prompt string.
@@ -394,14 +394,28 @@ class GeminiLLMService:
         Returns:
             str: The LLM's text response.
         """
-        try:
-            response = self.model.generate_content(prompt)
-            if response.candidates and response.candidates[0].content.parts:
-                return response.text
-            return ""
-        except Exception as e:
-            logger.error(f"Gemini error: {e}")
-            return ""
+        max_retries = 3
+        base_delay = 2
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.model.generate_content(prompt)
+                if response.candidates and response.candidates[0].content.parts:
+                    return response.text
+                return ""
+            except Exception as e:
+                # Check for 429 Resource Exhausted (Google API or gRPC error)
+                error_str = str(e)
+                is_429 = "429" in error_str or "Resource exhausted" in error_str
+                
+                if is_429 and attempt < max_retries:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Gemini 429 Rate Limit. Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                    time.sleep(delay)
+                    continue
+                
+                logger.error(f"Gemini error: {e}")
+                return ""
 
     def extract_paper_info(self, context: str) -> Dict[str, str]:
         """
@@ -686,6 +700,9 @@ Content to summarize:
             
             raw_summary = self._generate(prompt)
             summaries[section_name] = clean_llm_summary(raw_summary)
+            
+            # Rate limiting: Sleep briefly to avoid hitting Gemini's RPM/TPM limits quickly
+            time.sleep(1)
         
         return summaries
 
