@@ -160,7 +160,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background p-8">
       <div className="w-full max-w-[95%] 2xl:max-w-[1800px] mx-auto space-y-8">
-        <div className="flex justify-between items-center bg-white/70 backdrop-blur-md p-6 rounded-3xl border border-[#F1E9D2] shadow-xl shadow-blue-900/5 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-900/10">
+        <div className="flex justify-between items-center bg-emerald-50/90 backdrop-blur-md p-6 rounded-3xl border border-emerald-200 shadow-xl shadow-emerald-500/10 transition-all duration-500 hover:shadow-2xl hover:shadow-emerald-500/20">
           <div className="flex items-center gap-6">
             <div className="relative group">
               <div className="absolute -inset-2 bg-linear-to-r from-[#D4AF37] to-[#1A365D] rounded-2xl blur-md opacity-20 group-hover:opacity-40 transition duration-1000"></div>
@@ -171,7 +171,7 @@ export default function Home() {
               />
             </div>
             <div className="space-y-0.5">
-              <h1 className="text-4xl font-extrabold tracking-tight text-[#1A365D]">
+              <h1 className="text-4xl font-extrabold tracking-tight text-[#1A365D] animate-shimmer">
                 PaperDigest <span className="text-[#D4AF37]">AI</span>
               </h1>
               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em] opacity-80">
@@ -235,7 +235,7 @@ export default function Home() {
 
         <Tabs defaultValue="papers" className="w-full">
           <div className="flex items-center justify-between mb-8 animate-in fade-in slide-in-from-bottom-2 duration-700">
-            <TabsList className="bg-white/40 backdrop-blur-sm p-1.5 rounded-2xl border border-[#F1E9D2]/80 shadow-sm">
+            <TabsList className="bg-emerald-50/80 backdrop-blur-sm p-1.5 rounded-2xl border border-emerald-200 shadow-sm">
               <TabsTrigger
                 value="papers"
                 className="px-10 py-3 rounded-xl data-[state=active]:bg-[#1A365D] data-[state=active]:text-white data-[state=active]:shadow-lg transition-all font-extrabold tracking-tight group"
@@ -270,7 +270,7 @@ export default function Home() {
                 variant="outline"
                 size="sm"
                 onClick={handleDeleteAll}
-                className="border-red-100 text-red-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-all font-bold px-4 h-10 rounded-xl flex items-center gap-2"
+                className="bg-emerald-100/80 border-emerald-200 text-red-500 hover:text-red-700 hover:bg-emerald-200 hover:border-emerald-300 transition-all font-bold px-4 h-10 rounded-xl flex items-center gap-2"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete All
