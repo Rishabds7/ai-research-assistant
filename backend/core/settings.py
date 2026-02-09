@@ -155,6 +155,9 @@ from corsheaders.defaults import default_headers
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'x-session-id',
     'content-disposition',
+    'cache-control',
+    'pragma',
+    'expires',
 ]
 
 # Allow embedding PDFs in iframes
