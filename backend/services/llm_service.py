@@ -21,6 +21,7 @@ AI INTERVIEW FOCUS:
 import json
 import re
 import time
+import random
 import logging
 from typing import Any, Dict, List, Optional, Protocol, Union
 
@@ -385,43 +386,56 @@ class GeminiLLMService:
         )
         logger.info(f"LLM: Initialized Gemini service with model {GEMINI_MODEL}")
 
-    def _generate(self, prompt: str) -> str:
+    def _generate(self, prompt: str) -> Optional[str]:
         """
-        Low-level API call wrapper with exponential backoff for 429 errors.
+        Robust API call wrapper with AGGRESSIVE retries for rate limits.
+        Designed to wait out the 60s quota window of Gemini Free Tier.
         
         Args:
             prompt: The full prompt string.
             
         Returns:
-            Optional[str]: The LLM's text response, or None if rate limited/failed.
+            Optional[str]: The LLM's text response, or None if completely failed after long wait.
         """
-        max_retries = 3
-        base_delay = 2
+        # 15 retries * ~30-60s avg delay = ~10-15 minutes of patience
+        max_retries = 15
+        base_delay = 5 
 
         for attempt in range(max_retries + 1):
             try:
                 response = self.model.generate_content(prompt)
                 if response.candidates and response.candidates[0].content.parts:
                     return response.text
-                return ""
+                return "" # Return empty string if swift safety filter blocks it, but not None
             except Exception as e:
-                # Check for 429 Resource Exhausted (Google API or gRPC error)
                 error_str = str(e)
+                # Check for 429 Resource Exhausted (Google API or gRPC error)
                 is_429 = "429" in error_str or "Resource exhausted" in error_str
                 
-                if is_429 and attempt < max_retries:
-                    delay = base_delay * (2 ** attempt)
-                    logger.warning(f"Gemini 429 Rate Limit. Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
-                    time.sleep(delay)
-                    continue
-                
-                # All retries exhausted
                 if is_429:
-                    logger.error(f"Gemini rate limit exhausted after {max_retries} retries. Returning None to trigger fallback.")
-                    return None  # Signal rate limit failure
+                    if attempt < max_retries:
+                        # Exponential backoff capped at 60s (Gemini quota resets every 60s)
+                        # 5, 10, 20, 40, 60, 60, 60...
+                        delay = min(60, base_delay * (2 ** attempt))
+                        
+                        # Add a small jitter to prevent thundering herd if multiple workers retry at once
+                        jitter = random.uniform(0, 5)
+                        wait_time = delay + jitter
+                        
+                        logger.warning(f"Gemini Rate Limit Hit (429). Waiting {wait_time:.1f}s to clear quota... (Attempt {attempt+1}/{max_retries})")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"Gemini rate limit exhausted after {max_retries} attempts.")
+                        return None
                 else:
-                    logger.error(f"Gemini error: {e}")
-                    return None  # Signal general failure
+                    # For non-429 errors (500, 503, etc), retry a few times then fail
+                    if attempt < 3: 
+                        logger.warning(f"Gemini API Error: {e}. Retrying... (Attempt {attempt+1})")
+                        time.sleep(5)
+                        continue
+                    logger.error(f"Gemini critical error: {e}")
+                    return None
 
     def extract_paper_info(self, context: str) -> Dict[str, str]:
         """
