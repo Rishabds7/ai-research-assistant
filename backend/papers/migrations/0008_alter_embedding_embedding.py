@@ -7,7 +7,7 @@ import pgvector.django
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('papers', '0007_clear_embeddings'),
+        ('papers', '0007_delete_gapanalysis_and_clear_embeddings'),
     ]
 
     operations = [
