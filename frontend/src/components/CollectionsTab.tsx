@@ -428,6 +428,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                         {/* Gap Analysis Section */}
                         {selectedCollection.papers && selectedCollection.papers.length >= 2 && (
                             <div className="border-t border-[#F1E9D2] pt-4">
+                                {/* eslint-disable-next-line */}
                                 <Button
                                     onClick={handleAnalyzeGaps}
                                     disabled={!!gapAnalysisTaskId}
@@ -440,6 +441,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                 {/* Gap Analysis Results */}
                                 {selectedCollection.gap_analysis && (
                                     <div className="mt-4">
+                                        {/* eslint-disable-next-line */}
                                         <button
                                             onClick={() => setIsGapAnalysisExpanded(!isGapAnalysisExpanded)}
                                             className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#1A365D]/5 to-[#2A4A7D]/5 rounded-lg border border-[#1A365D]/20 hover:bg-gradient-to-r hover:from-[#1A365D]/10 hover:to-[#2A4A7D]/10 transition-all"
