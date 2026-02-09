@@ -13,16 +13,23 @@ It uses Django Rest Framework (DRF) to handle:
 import re
 import requests
 import json
+from typing import Any, Dict, List, Optional, Union
 from rest_framework import viewsets, status, views
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.db.models import QuerySet
 from django.core.files.base import ContentFile
+from django.utils import timezone
+from datetime import timedelta
+from django.db import transaction
 
-from .models import Paper, Methodology, TaskStatus
+from .models import Paper, Methodology, TaskStatus, Collection
 from .serializers import (
     PaperListSerializer, PaperDetailSerializer, 
-    MethodologySerializer, TaskStatusSerializer
+    MethodologySerializer, TaskStatusSerializer,
+    CollectionDetailSerializer, CollectionListSerializer
 )
 from .tasks import (
     process_pdf_task, extract_methodology_task, 
@@ -36,17 +43,18 @@ class PaperViewSet(viewsets.ModelViewSet):
     The main API for Paper management.
     Includes Standard CRUD (Create, Read, Update, Delete) + Custom AI Actions.
     """
-    def get_queryset(self):
+    
+    def get_queryset(self) -> QuerySet:
         """
         Filters papers based on the 'X-Session-ID' header.
         This provides basic privacy/isolation for public demo users without full auth.
         
         SELF-HEALING: Automatically re-triggers processing for orphaned papers 
         (papers that were created but never processed due to lost Celery tasks).
-        """
-        from django.utils import timezone
-        from datetime import timedelta
         
+        Returns:
+            QuerySet: Filtered list of Papers.
+        """
         queryset = Paper.objects.all()
         session_id = self.request.headers.get('X-Session-ID')
         
@@ -95,15 +103,22 @@ class PaperViewSet(viewsets.ModelViewSet):
             
         return queryset.order_by('-uploaded_at')
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Any:
+        """Selects the appropriate serializer based on the action."""
         if self.action == 'list':
             return PaperListSerializer
         return PaperDetailSerializer
     
-    def create(self, request, *args, **kwargs):
+    def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handles PDF upload.
         Saves the file to disk and starts the initial background task (text extraction).
+        
+        Args:
+            request: The HTTP request containing the PDF file.
+            
+        Returns:
+            Response: JSON with paper details and initial task ID.
         """
         # Override create to trigger async processing
         if 'file' not in request.FILES:
@@ -139,10 +154,14 @@ class PaperViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_201_CREATED, headers=headers)
 
     @action(detail=True, methods=['post'])
-    def extract_methodology(self, request, pk=None):
+    def extract_methodology(self, request: Request, pk: Optional[str] = None) -> Response:
         """
         Triggered when a user clicks 'Methodology' in the UI.
         Runs an AI task to extract structured technical details.
+        
+        Args:
+            request: The HTTP request.
+            pk: The UUID of the paper.
         """
         paper = self.get_object()
         if not paper.processed:
@@ -157,10 +176,14 @@ class PaperViewSet(viewsets.ModelViewSet):
         return Response({'task_id': task.id})
 
     @action(detail=True, methods=['post'])
-    def extract_all_sections(self, request, pk=None):
+    def extract_all_sections(self, request: Request, pk: Optional[str] = None) -> Response:
         """
         Triggered when 'Summarize' is clicked.
         Generates individual section summaries and a global summary.
+        
+        Args:
+            request: The HTTP request.
+            pk: The UUID of the paper.
         """
         paper = self.get_object()
         if not paper.processed:
@@ -180,7 +203,14 @@ class PaperViewSet(viewsets.ModelViewSet):
         return Response({'task_id': task.id})
 
     @action(detail=True, methods=['post'])
-    def extract_metadata(self, request, pk=None):
+    def extract_metadata(self, request: Request, pk: Optional[str] = None) -> Response:
+        """
+        Triggers metadata extraction for specific fields (e.g. datasets, licenses).
+        
+        Args:
+            request: HTTP Request containing 'field' in body.
+            pk: UUID of the paper.
+        """
         field = request.data.get('field')
         if field not in ['datasets', 'licenses']:
             return Response({'error': 'Invalid field'}, status=status.HTTP_400_BAD_REQUEST)
@@ -218,17 +248,20 @@ class PaperViewSet(viewsets.ModelViewSet):
         return Response({'task_id': task.id})
 
     @action(detail=False, methods=['post'])
-    def delete_all(self, request):
+    def delete_all(self, request: Request) -> Response:
         """Delete all papers and associated data."""
         Paper.objects.all().delete()
         TaskStatus.objects.all().delete()
         return Response({'status': 'all papers and data deleted'}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
-    def ingest_arxiv(self, request):
+    def ingest_arxiv(self, request: Request) -> Response:
         """
         Ingests a paper directly from ArXiv.
         Accepts: {'url': 'https://arxiv.org/abs/2303.12345'} or {'url': '2303.12345'}
+        
+        Args:
+            request: HTTP Request with 'url' in body.
         """
         input_url = request.data.get('url', '').strip()
         session_id = request.headers.get('X-Session-ID')
@@ -263,7 +296,6 @@ class PaperViewSet(viewsets.ModelViewSet):
             paper.file.save(filename, ContentFile(response.content), save=True)
             
             # 5. Trigger Task (Resiliently)
-            from django.db import transaction
             
             # We generate the task ID immediately but delay execution 
             # lightly to ensure DB consistency
@@ -297,9 +329,16 @@ class PaperViewSet(viewsets.ModelViewSet):
             return Response({'error': f"ArXiv fetch failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['get'])
-    def export_bibtex(self, request, pk=None):
+    def export_bibtex(self, request: Request, pk: Optional[str] = None) -> Response:
         """
         Generates a BibTeX entry for the paper.
+        
+        Args:
+            request: HTTP Request.
+            pk: UUID of the paper.
+            
+        Returns:
+            Response: JSON with 'bibtex' string.
         """
         paper = self.get_object()
         
@@ -340,7 +379,7 @@ class TaskStatusView(views.APIView):
     Dedicated endpoint for the frontend to poll status of long-running tasks.
     Example: GET /api/tasks/uuid-of-task/
     """
-    def get(self, request, task_id):
+    def get(self, request: Request, task_id: str) -> Response:
         task = get_object_or_404(TaskStatus, task_id=task_id)
         serializer = TaskStatusSerializer(task)
         return Response(serializer.data)
@@ -351,9 +390,8 @@ class CollectionViewSet(viewsets.ModelViewSet):
     API for managing paper collections.
     Allows users to create, update, delete collections and manage paper membership.
     """
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         """Filter collections by session ID."""
-        from .models import Collection
         queryset = Collection.objects.all()
         session_id = self.request.headers.get('X-Session-ID')
         
@@ -364,20 +402,19 @@ class CollectionViewSet(viewsets.ModelViewSet):
         
         return queryset.prefetch_related('papers')
     
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Any:
         """Use different serializers for list vs detail views."""
-        from .serializers import CollectionListSerializer, CollectionDetailSerializer
         if self.action == 'list':
             return CollectionListSerializer
         return CollectionDetailSerializer
     
-    def perform_create(self, serializer):
+    def perform_create(self, serializer: CollectionListSerializer) -> None:
         """Automatically set session_id when creating a collection."""
         session_id = self.request.headers.get('X-Session-ID')
         serializer.save(session_id=session_id)
     
     @action(detail=True, methods=['post'])
-    def add_paper(self, request, pk=None):
+    def add_paper(self, request: Request, pk: Optional[str] = None) -> Response:
         """
         Add a paper to this collection.
         POST /api/collections/{id}/add_paper/
@@ -411,7 +448,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
         })
     
     @action(detail=True, methods=['post'])
-    def remove_paper(self, request, pk=None):
+    def remove_paper(self, request: Request, pk: Optional[str] = None) -> Response:
         """
         Remove a paper from this collection.
         POST /api/collections/{id}/remove_paper/
@@ -437,5 +474,5 @@ class CollectionViewSet(viewsets.ModelViewSet):
 
 
 class PingView(views.APIView):
-    def get(self, request):
+    def get(self, request: Request) -> Response:
         return Response({"status": "online", "message": "Backend is running!"}, status=status.HTTP_200_OK)

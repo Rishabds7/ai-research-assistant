@@ -13,7 +13,7 @@ It uses PyMuPDF (fitz) to:
 import json
 import re
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Dict, List, Union
 
 import fitz
 
@@ -73,7 +73,7 @@ class PDFProcessor:
             pdf_path: Path to the PDF file.
 
         Returns:
-            Concatenated text from all pages.
+            str: Concatenated text from all pages.
 
         Raises:
             ValueError: If PDF is corrupted, empty, or cannot be opened.
@@ -88,7 +88,7 @@ class PDFProcessor:
             raise ValueError(f"Could not open PDF: {e}") from e
 
         try:
-            text_parts: list[str] = []
+            text_parts: List[str] = []
             for page in doc:
                 # Use sort=True to better handle multi-column layouts
                 text_parts.append(page.get_text("text", sort=True))
@@ -103,14 +103,20 @@ class PDFProcessor:
             doc.close()
             raise ValueError(f"Error extracting text: {e}") from e
 
-    def detect_sections(self, text: str) -> dict[str, str]:
+    def detect_sections(self, text: str) -> Dict[str, str]:
         """
         Segment the paper into logical parts (Abstract, Methodology, etc.) using a two-pass approach.
         
         Pass 1: Identifies numbered headers (e.g., '1. Introduction', 'II. Methods').
         Pass 2: Searches for key academic keywords in isolation to catch non-numbered headers.
+        
+        Args:
+            text: The full text of the paper.
+            
+        Returns:
+            Dict[str, str]: A dictionary of detected section titles and their content.
         """
-        sections: dict[str, str] = {}
+        sections: Dict[str, str] = {}
         text_lower = text.lower()
         
         # Pass 1: Generic Numbered Headers
@@ -229,9 +235,16 @@ class PDFProcessor:
         
         return sections
 
-    def process_pdf(self, pdf_path: Union[Path, str], paper_id: str) -> dict[str, Any]:
+    def process_pdf(self, pdf_path: Union[Path, str], paper_id: str) -> Dict[str, Any]:
         """
         Orchestrates the extraction pipeline: text -> logical segmentation.
+        
+        Args:
+            pdf_path: Path to the PDF file.
+            paper_id: The ID of the paper being processed.
+            
+        Returns:
+            Dict[str, Any]: A dictionary containing the paper ID, full text, and detected sections.
         """
         path = Path(pdf_path)
         full_text = self.extract_text(path)

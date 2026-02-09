@@ -1,3 +1,10 @@
+/**
+ * UTILITY FUNCTIONS
+ * Project: Research Assistant
+ * File: frontend/src/lib/utils.ts
+ * 
+ * Common helper functions for class merging (Tailwind) and safe data parsing.
+ */
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 

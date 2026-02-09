@@ -17,6 +17,8 @@ AI INTERVIEW FOCUS:
 """
 import logging
 import uuid
+import json
+from typing import Any, Dict, List, Optional, Union
 from celery import shared_task
 from django.conf import settings
 
@@ -27,11 +29,17 @@ from services.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
-def sanitize_text(text):
+def sanitize_text(text: Union[str, Dict, List, Any]) -> Union[str, Dict, List, Any]:
     """
     CLEANING LOGIC:
     Removes NUL characters and junk that would crash the PostgreSQL JSON/Text fields.
     Ensures data integrity between the AI output and the Database.
+    
+    Args:
+        text: Input text, dict, or list.
+        
+    Returns:
+        Sanitized input with NUL characters removed.
     """
     if isinstance(text, str):
         return text.replace('\x00', '')
@@ -41,11 +49,17 @@ def sanitize_text(text):
         return [sanitize_text(i) for i in text]
     return text
 
-def update_task_status(task_id, status, result=None, error=None):
+def update_task_status(task_id: str, status: str, result: Optional[Dict] = None, error: Optional[str] = None) -> None:
     """
     UI SYNC LOGIC:
     Updates a central 'TaskStatus' record so the frontend's 'Checking...' 
     indicator knows when to reveal the results.
+    
+    Args:
+        task_id: The Celery task UUID.
+        status: The new status string (e.g., 'running', 'completed').
+        result: Optional JSON result data.
+        error: Optional error message.
     """
     try:
         ts, _ = TaskStatus.objects.get_or_create(task_id=task_id, defaults={'task_type': 'unknown'})
@@ -59,10 +73,16 @@ def update_task_status(task_id, status, result=None, error=None):
         logger.error(f"Failed to update task status {task_id}: {e}")
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=10)
-def process_pdf_task(self, paper_id):
+def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
     """
     INITIAL INGESTION PIPELINE (Stage 1).
     Configured with retries for resilience on platforms like Render Free Tier.
+    
+    Args:
+        paper_id: UUID of the Paper to process.
+        
+    Returns:
+        Dict: Status and paper_id on success.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
@@ -95,7 +115,6 @@ def process_pdf_task(self, paper_id):
             
             authors_data = info.get('authors', 'Unknown')
             if isinstance(authors_data, list):
-                import json
                 paper.authors = json.dumps(authors_data)
             else:
                 paper.authors = sanitize_text(authors_data)
@@ -103,6 +122,7 @@ def process_pdf_task(self, paper_id):
             logger.info(f"Metadata identified: {paper.title} ({paper.year})")
         except Exception as e:
             logger.error(f"Metadata extraction failed (non-fatal): {e}")
+            # Ensure we have at least a title
             if not paper.title:
                 paper.title = paper.filename
                 paper.save(update_fields=['title'])
@@ -121,10 +141,13 @@ def process_pdf_task(self, paper_id):
         raise
 
 @shared_task(bind=True)
-def generate_embeddings_task(self, paper_id):
+def generate_embeddings_task(self, paper_id: str) -> None:
     """
     NON-BLOCKING TASK: Generate semantic vectors for RAG search.
     This runs after the paper is already 'Ready' in the UI.
+    
+    Args:
+        paper_id: UUID of the Paper.
     """
     try:
         paper = Paper.objects.get(id=paper_id)
@@ -136,13 +159,19 @@ def generate_embeddings_task(self, paper_id):
         logger.error(f"Embeddings failed: {e}")
 
 @shared_task(bind=True)
-def extract_methodology_task(self, paper_id):
+def extract_methodology_task(self, paper_id: str) -> Dict[str, Any]:
     """
     TECHNICAL DEEP-DIVE TASK (Stage 2).
     
     Focuses specifically on the technical stack of the paper.
     If a clear 'Methodology' section isn't found, it uses 'Smart-RAG' 
     (semantic search) to gather text related to experiments and math.
+    
+    Args:
+        paper_id: UUID of the Paper.
+        
+    Returns:
+        Dict: Extracted methodology data.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
@@ -181,12 +210,18 @@ def extract_methodology_task(self, paper_id):
         raise
 
 @shared_task(bind=True)
-def extract_all_sections_task(self, paper_id):
+def extract_all_sections_task(self, paper_id: str) -> Dict[str, str]:
     """
     HIERARCHICAL SUMMARIZATION TASK (Stage 2).
     
     1. Summarizes individual logical sections (Abstract, Intro, etc.).
     2. Uses those summaries to generate a 'Global Summary' (Multi-stage synthesis).
+    
+    Args:
+        paper_id: UUID of the Paper.
+        
+    Returns:
+        Dict: Map of section names to summaries.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
@@ -229,13 +264,20 @@ def extract_all_sections_task(self, paper_id):
         raise
 
 @shared_task(bind=True)
-def extract_metadata_task(self, paper_id, field):
+def extract_metadata_task(self, paper_id: str, field: str) -> Dict[str, Any]:
     """
     TARGETED EXTRACTION TASK (Ad-hoc).
     
     Triggers when the user requests specific tags like 'Datasets' or 'Licenses'.
     Study the 'Context Selection Logic' here—it's a great example of 
     handling token limits by intelligently cropping the paper text.
+    
+    Args:
+        paper_id: UUID of the Paper.
+        field: The metadata field to extract (e.g., 'datasets', 'licenses').
+        
+    Returns:
+        Dict: Extracted metadata for the field.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')

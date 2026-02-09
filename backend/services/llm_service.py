@@ -22,7 +22,7 @@ import json
 import re
 import time
 import logging
-from typing import Any, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, Union
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +46,12 @@ class LLMBackend(Protocol):
     Defining a Protocol (Interface) for AI providers.
     Every provider (Gemini or Ollama) must implement these research tasks.
     """
-    def extract_methodology(self, context: str) -> dict[str, Any]: ...
-    def summarize_sections(self, sections: dict[str, str]) -> dict[str, str]: ...
-    def extract_datasets(self, context: str) -> list[str]: ...
-    def extract_licenses(self, context: str) -> list[str]: ...
-    def extract_paper_info(self, context: str) -> dict[str, str]: ...
-    def generate_global_summary(self, section_summaries: dict[str, str]) -> str: ...
+    def extract_methodology(self, context: str) -> Dict[str, Any]: ...
+    def summarize_sections(self, sections: Dict[str, str], full_text: str = "") -> Dict[str, str]: ...
+    def extract_datasets(self, context: str) -> List[str]: ...
+    def extract_licenses(self, paper_text: str) -> List[str]: ...
+    def extract_paper_info(self, context: str) -> Dict[str, str]: ...
+    def generate_global_summary(self, section_summaries: Dict[str, str]) -> str: ...
 
 
 def _strip_json_markdown(raw: str) -> str:
@@ -59,6 +59,12 @@ def _strip_json_markdown(raw: str) -> str:
     CLEANING LOGIC:
     Many LLMs (like Llama 3) wrap their answers in ```json blocks even when asked not to.
     This function strips those markers to ensure the JSON parser targets only the raw data.
+    
+    Args:
+        raw: The raw string response from the LLM.
+        
+    Returns:
+        str: The string with markdown code blocks removed.
     """
     text = raw.strip()
     if text.startswith("```json"):
@@ -80,6 +86,13 @@ def _parse_json_safe(raw: str, default: Any = None) -> Any:
     1. Try parsing directly.
     2. If fails, use Regex to find the first '{' and last '}' or '[' and ']'.
     3. Extract that middle 'core' and try parsing again.
+    
+    Args:
+        raw: The raw output string from the LLM.
+        default: Value to return if parsing fails completely.
+        
+    Returns:
+        Any: The parsed JSON object (dict or list) or the default value.
     """
     if not raw:
         return default if default is not None else []
@@ -127,6 +140,12 @@ def clean_llm_summary(text: str) -> str:
     """
     Aggressively removes intro/outro meta-text from the LLM. 
     Also normalizes content by merging wrapped lines and removing leading bullets.
+    
+    Args:
+        text: Raw summary text from LLM.
+        
+    Returns:
+        str: Cleaned, bulleted text.
     """
     if not text:
         return ""
@@ -210,10 +229,16 @@ def clean_llm_summary(text: str) -> str:
     return '\n'.join(processed_points)
 
 
-def _extract_license_snippets(text: str) -> list[str]:
+def _extract_license_snippets(text: str) -> List[str]:
     """
     Heuristic snippet finder to locate license/copyright info across the WHOLE paper.
     Returns a list of relevant text chunks with context.
+    
+    Args:
+        text: Full text of the paper.
+        
+    Returns:
+        List[str]: List of relevant text snippets.
     """
     # Strong License Keywords (High signal)
     strong_keywords = [
@@ -292,9 +317,15 @@ def _extract_license_snippets(text: str) -> list[str]:
     return snippets[:100] # Increase limit to 100 to ensure "whole paper" is covered
 
 
-def _extract_dataset_snippets(text: str) -> list[str]:
+def _extract_dataset_snippets(text: str) -> List[str]:
     """
     Heuristic snippet finder to locate dataset/source info across the WHOLE paper.
+    
+    Args:
+        text: Full text.
+        
+    Returns:
+        List[str]: Relevant snippets.
     """
     keywords = [
         r"dataset", r"benchmark", r"corpus", r"evaluation set",
@@ -356,6 +387,12 @@ class GeminiLLMService:
     def _generate(self, prompt: str) -> str:
         """
         Low-level API call wrapper with basic error handling.
+        
+        Args:
+            prompt: The full prompt string.
+            
+        Returns:
+            str: The LLM's text response.
         """
         try:
             response = self.model.generate_content(prompt)
@@ -366,10 +403,16 @@ class GeminiLLMService:
             logger.error(f"Gemini error: {e}")
             return ""
 
-    def extract_paper_info(self, context: str) -> dict[str, str]:
+    def extract_paper_info(self, context: str) -> Dict[str, str]:
         """
         Uses first 10,000 characters to extract Title and Authors.
         Academic titles are usually prominent in the first few lines of raw text.
+        
+        Args:
+            context: Text context (usually preamble of paper).
+            
+        Returns:
+            Dict: with keys 'title', 'authors', 'year', 'journal'.
         """
         prompt = """Extract the following metadata from this research paper:
 1. Title
@@ -395,10 +438,16 @@ Text:
             "journal": "Unknown"
         })
 
-    def extract_datasets(self, context: str) -> list[str]:
+    def extract_datasets(self, context: str) -> List[str]:
         """
         Uses snippet-based isolation to find data sources. 
         Better than full-text extraction for long documents as it avoids dilution.
+        
+        Args:
+            context: Combined text snippets containing dataset keywords.
+            
+        Returns:
+            List[str]: List of dataset names.
         """
         snippets = _extract_dataset_snippets(context)
         snippets_text = "\n---\n".join(snippets)
@@ -423,11 +472,17 @@ Snippets:
         result = _parse_json_safe(raw, ["None mentioned"])
         return result if result else ["None mentioned"]
 
-    def extract_licenses(self, paper_text: str) -> list[str]:
+    def extract_licenses(self, paper_text: str) -> List[str]:
         """
         Hyper-accurate license scanner.
         Combines targeted snippet extraction for high-signal areas 
         with full-text scanning for global context.
+        
+        Args:
+            paper_text: Full text of the paper.
+            
+        Returns:
+            List[str]: List of identified licenses.
         """
         # 1. Target the High-Signal areas first (Head, Tail, Acknowledgments)
         head = paper_text[:15000].replace('\n', ' ')
@@ -506,6 +561,12 @@ Return ONLY the JSON list of strings."""
         """
         Fixes PDF extraction artifacts like mid-word hyphens and unnecessary line breaks
         before sending to the LLM.
+        
+        Args:
+            text: Raw input text.
+            
+        Returns:
+            str: Cleaned text.
         """
         if not text: return ""
         # 1. Join words broken by hyphens at end of lines
@@ -522,10 +583,17 @@ Return ONLY the JSON list of strings."""
                 processed.append(line)
         return "\n".join(processed)
 
-    def summarize_sections(self, sections: dict[str, str], full_text: str = "") -> dict[str, str]:
+    def summarize_sections(self, sections: Dict[str, str], full_text: str = "") -> Dict[str, str]:
         """
         Maps paper sections to standardized academic sections and creates summaries.
         Uses full_text as a fallback if specific sections like Abstract are missing.
+        
+        Args:
+            sections: Dictionary of {SectionName: Content}.
+            full_text: The entire paper text (as backup).
+            
+        Returns:
+            Dict: Map of {StandardSectionName: Summary}.
         """
         # Standardized section mapping
         STANDARD_SECTIONS = [
@@ -621,19 +689,31 @@ Content to summarize:
         
         return summaries
 
-    def extract_methodology(self, context: str) -> dict[str, Any]:
+    def extract_methodology(self, context: str) -> Dict[str, Any]:
         """
         Highly structured methodology extraction.
         Returns a JSON schema containing datasets, model architecture, and metrics.
+        
+        Args:
+            context: Text context focused on methods.
+        
+        Returns:
+            Dict: Schema with keys 'datasets', 'model', 'metrics', 'results', 'summary'.
         """
         prompt = f"Extract methodology details (datasets, model, metrics, results, summary). Return ONLY JSON.\n\nText:\n{context}"
         raw = self._generate(prompt)
         return _parse_json_safe(raw, {})
 
-    def generate_global_summary(self, section_summaries: dict[str, str]) -> str:
+    def generate_global_summary(self, section_summaries: Dict[str, str]) -> str:
         """
         Final synthesis step. Combines individual section insights into 
         a 'Global Summary' (TL;DR) for the reviewer dashboard.
+        
+        Args:
+            section_summaries: Map of section names to summary texts.
+            
+        Returns:
+            str: Global summary text.
         """
         combined = "\n".join([f"{n}:\n{t}" for n, t in section_summaries.items()])
         prompt = f"""Synthesize these section summaries into a comprehensive final overview of the paper.
@@ -656,13 +736,23 @@ class OllamaLLMService:
     Crucial for interview discussions about privacy and offline research tools.
     """
     def __init__(self) -> None:
-        self.host = OLLAMA_HOST.rstrip("/")
+        if OLLAMA_HOST:
+             self.host = OLLAMA_HOST.rstrip("/")
+        else:
+             self.host = "http://localhost:11434"
         self.model = OLLAMA_MODEL
         logger.info(f"LLM: Initialized Ollama service at {self.host} with model {self.model}")
 
     def _generate(self, prompt: str, system: str = "") -> str:
         """
         Standard HTTP POST to the Ollama /api/generate endpoint.
+        
+        Args:
+            prompt: User prompt.
+            system: System prompt (optional).
+            
+        Returns:
+            str: Generated text.
         """
         url = f"{self.host}/api/generate"
         payload = {
@@ -684,7 +774,16 @@ class OllamaLLMService:
             return ""
 
     # Complete implementation matching GeminiLLMService
-    def extract_paper_info(self, context: str) -> dict[str, str]:
+    def extract_paper_info(self, context: str) -> Dict[str, str]:
+        """
+        Extracts title and authors from the paper context.
+        
+        Args:
+            context: Text context (usually preamble of paper).
+            
+        Returns:
+            Dict: with keys 'title', 'authors' (plus optional keys).
+        """
         prompt = f"""Analyze the provided text to identify its document type, title, and authors.
         
         Task 1: Classify the document. Is it a "Research Paper" (academic, technical, scientific)?
@@ -706,7 +805,16 @@ class OllamaLLMService:
         {context[:5000]}"""
         return _parse_json_safe(self._generate(prompt), {"title": "Unknown", "authors": ["Unknown"]})
     
-    def extract_datasets(self, context: str) -> list[str]:
+    def extract_datasets(self, context: str) -> List[str]:
+        """
+        Extracts dataset names from text snippets.
+        
+        Args:
+            context: Text snippets containing keywords.
+            
+        Returns:
+            List[str]: List of dataset names.
+        """
         snippets = _extract_dataset_snippets(context)
         if not snippets: return []
         
@@ -720,9 +828,18 @@ Snippets:
         raw = self._generate(prompt)
         return _parse_json_safe(raw, [])
     
-    def extract_licenses(self, context: str) -> list[str]:
+    def extract_licenses(self, paper_text: str) -> List[str]:
+        """
+        Extracts licenses from the full paper text.
+        
+        Args:
+            paper_text: Full text of the paper.
+            
+        Returns:
+            List[str]: List of identified licenses.
+        """
         # 1. Scan full text for license snippets
-        snippets = _extract_license_snippets(context)
+        snippets = _extract_license_snippets(paper_text)
         if not snippets: return []
             
         # 2. LLM Call with evidence extraction
@@ -746,10 +863,17 @@ Snippets:
                     seen.add(lic.lower())
         return licenses
 
-    def summarize_sections(self, sections: dict[str, str]) -> dict[str, str]:
+    def summarize_sections(self, sections: Dict[str, str], full_text: str = "") -> Dict[str, str]:
         """
         Maps paper sections to standardized academic sections and creates summaries.
         Returns summaries in a fixed order with bullet points.
+        
+        Args:
+            sections: Dictionary of {SectionName: Content}.
+            full_text: (Unused in Ollama impl, kept for Protocol compatibility).
+            
+        Returns:
+            Dict: Map of {StandardSectionName: Summary}.
         """
         # Standardized section mapping
         STANDARD_SECTIONS = [
@@ -810,12 +934,30 @@ Section Content:
         
         return summaries
     
-    def extract_methodology(self, context: str) -> dict[str, Any]:
+    def extract_methodology(self, context: str) -> Dict[str, Any]:
+        """
+        Extracts methodology details.
+        
+        Args:
+            context: Text context.
+            
+        Returns:
+            Dict: Schema with methodology details.
+        """
         prompt = f"Extract methodology details (datasets, model, metrics, results, summary). Return ONLY JSON.\n\nText:\n{context[:6000]}"
         raw = self._generate(prompt)
         return _parse_json_safe(raw, {})
 
-    def generate_global_summary(self, section_summaries: dict[str, str]) -> str:
+    def generate_global_summary(self, section_summaries: Dict[str, str]) -> str:
+        """
+        Generates a global summary from section summaries.
+        
+        Args:
+            section_summaries: Map of section summaries.
+            
+        Returns:
+            str: Global summary text.
+        """
         combined = "\n".join([f"{n}:\n{t}" for n, t in section_summaries.items()])
         prompt = f"""Synthesize these summaries into a global overview of the paper with 6-8 high-impact points.
 
@@ -831,14 +973,20 @@ Summaries:
 
 class LLMService:
     """
-    THE FACTORY.
-    This singleton-style class manages the switch between local and cloud providers.
-    In the interview, this demonstrates 'Abstraction'—the rest of the app 
-    doesn't care WHERE the AI comes from.
+    Factory class for getting the configured LLM backend.
+    
+    This class implements the Singleton pattern to ensure only one instance 
+    of the LLM service is created and reused throughout the application lifecycle.
     """
-    _instance = None
+    _instance: Optional[Union[GeminiLLMService, OllamaLLMService]] = None
 
-    def __new__(cls):
+    def __new__(cls) -> Union[GeminiLLMService, OllamaLLMService]:
+        """
+        Creates or returns the singleton instance of the LLM service.
+        
+        Returns:
+            Union[GeminiLLMService, OllamaLLMService]: The configured LLM service instance.
+        """
         if cls._instance is None:
             if LLM_PROVIDER == "gemini":
                 cls._instance = GeminiLLMService()

@@ -7,7 +7,7 @@
  * It uses Axios for HTTP requests and defines the Type interfaces 
  * for consistent data handling across the frontend.
  */
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -15,7 +15,11 @@ export const api = axios.create({
     baseURL: API_URL,
 });
 
-export const getMediaUrl = (path: string) => {
+/**
+ * Returns the full URL for a media file.
+ * @param path Relative path from the API response
+ */
+export const getMediaUrl = (path: string): string => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
     const baseUrl = API_URL.replace('/api', '');
@@ -23,7 +27,7 @@ export const getMediaUrl = (path: string) => {
 };
 
 // Helper to get or create a persistent session ID
-const getSessionId = () => {
+const getSessionId = (): string => {
     if (typeof window === 'undefined') return '';
     let sessionId = localStorage.getItem('research_session_id');
     if (!sessionId) {
@@ -41,6 +45,8 @@ api.interceptors.request.use((config) => {
     }
     return config;
 });
+
+// --- TYPE DEFINITIONS ---
 
 export interface Paper {
     id: string;
@@ -73,10 +79,10 @@ export interface Paper {
 
 export interface Methodology {
     id: string;
-    datasets: string[] | any[];
-    model: any;
-    metrics: string[] | any[];
-    results: any;
+    datasets: string[];
+    model: Record<string, any>; // Flexible JSON object
+    metrics: string[];
+    results: Record<string, any>; // Flexible JSON object
     summary: string;
 }
 
@@ -87,78 +93,144 @@ export interface SectionSummary {
     order_index?: number;
 }
 
-export const uploadPaper = async (file: File) => {
+export interface TaskByIdResponse {
+    task_id: string;
+}
+
+export interface TaskStatusResponse {
+    task_id: string;
+    task_type: string; // 'process_pdf', 'summarize', etc.
+    status: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | 'RETRY' | 'REVOKED';
+    result?: any;
+    error?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface AnalysisResponse {
+    markdown: string;
+}
+
+// --- API CLIENT FUNCTIONS ---
+
+/**
+ * Uploads a PDF paper to the backend.
+ * @param file The PDF file object
+ */
+export const uploadPaper = async (file: File): Promise<{ paper: Paper; task_id: string }> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/papers/', formData);
+    const response = await api.post<{ paper: Paper; task_id: string }>('/papers/', formData);
     return response.data;
 };
 
-export const getPapers = async () => {
-    const response = await api.get('/papers/');
+/**
+ * Fetches all papers.
+ */
+export const getPapers = async (): Promise<Paper[]> => {
+    const response = await api.get<any>('/papers/');
     // Handle Django REST Framework pagination
     if (response.data && response.data.results) {
         return response.data.results;
     }
+    return response.data as Paper[];
+};
+
+/**
+ * Fetches a single paper by ID.
+ * @param id Paper ID
+ */
+export const getPaper = async (id: string): Promise<Paper> => {
+    const response = await api.get<Paper>(`/papers/${id}/`);
     return response.data;
 };
 
-export const getPaper = async (id: string) => {
-    const response = await api.get(`/papers/${id}/`);
+/**
+ * Triggers methodology extraction.
+ */
+export const extractMethodology = async (id: string): Promise<TaskByIdResponse> => {
+    const response = await api.post<TaskByIdResponse>(`/papers/${id}/extract_methodology/`);
     return response.data;
 };
 
-export const extractMethodology = async (id: string) => {
-    const response = await api.post(`/papers/${id}/extract_methodology/`);
-    return response.data; // { task_id: ... }
-};
-
-export const extractAllSections = async (id: string) => {
-    const response = await api.post(`/papers/${id}/extract_all_sections/`);
-    return response.data; // { task_id: ... }
-};
-
-export const getTaskStatus = async (taskId: string) => {
-    const response = await api.get(`/tasks/${taskId}/`);
+/**
+ * Triggers extraction of all sections (Abstract, Intro, etc.).
+ */
+export const extractAllSections = async (id: string): Promise<TaskByIdResponse> => {
+    const response = await api.post<TaskByIdResponse>(`/papers/${id}/extract_all_sections/`);
     return response.data;
 };
 
-export const analyzeGaps = async (paperIds: string[]) => {
-    const response = await api.post('/analysis/gaps/', { paper_ids: paperIds });
-    return response.data; // { task_id: ... }
+/**
+ * Checks the status of a background task.
+ * @param taskId The Celery task ID
+ */
+export const getTaskStatus = async (taskId: string): Promise<TaskStatusResponse> => {
+    const response = await api.get<TaskStatusResponse>(`/tasks/${taskId}/`);
+    return response.data;
 };
 
-export const generateComparison = async (paperIds: string[]) => {
-    const response = await api.post('/analysis/comparison/', { paper_ids: paperIds });
-    return response.data; // { markdown: ... } (sync) or task_id
+/**
+ * Analyzes research gaps across multiple papers.
+ */
+export const analyzeGaps = async (paperIds: string[]): Promise<TaskByIdResponse> => {
+    const response = await api.post<TaskByIdResponse>('/analysis/gaps/', { paper_ids: paperIds });
+    return response.data;
 };
 
-export const deletePaper = async (id: string) => {
+/**
+ * Generates a comparison matrix/text for papers.
+ */
+export const generateComparison = async (paperIds: string[]): Promise<AnalysisResponse | TaskByIdResponse> => {
+    const response = await api.post<AnalysisResponse | TaskByIdResponse>('/analysis/comparison/', { paper_ids: paperIds });
+    return response.data;
+};
+
+/**
+ * Deletes a single paper.
+ */
+export const deletePaper = async (id: string): Promise<void> => {
     await api.delete(`/papers/${id}/`);
 };
 
-export const deleteAllPapers = async () => {
+/**
+ * Deletes ALL papers. 
+ * WARNING: Destructive action.
+ */
+export const deleteAllPapers = async (): Promise<void> => {
     await api.post('/papers/delete_all/');
 };
 
-export const updatePaper = async (id: string, data: Partial<Paper>) => {
-    const response = await api.patch(`/papers/${id}/`, data);
+/**
+ * Updates paper metadata (notes, title, etc.).
+ */
+export const updatePaper = async (id: string, data: Partial<Paper>): Promise<Paper> => {
+    const response = await api.patch<Paper>(`/papers/${id}/`, data);
     return response.data;
 };
 
-export const extractMetadata = async (id: string, field: 'datasets' | 'licenses') => {
-    const response = await api.post(`/papers/${id}/extract_metadata/`, { field });
-    return response.data; // { task_id: ... }
+/**
+ * Triggers specific metadata extraction (datasets or licenses).
+ */
+export const extractMetadata = async (id: string, field: 'datasets' | 'licenses'): Promise<TaskByIdResponse> => {
+    const response = await api.post<TaskByIdResponse>(`/papers/${id}/extract_metadata/`, { field });
+    return response.data;
 };
 
-export const ingestArxiv = async (url: string) => {
-    const response = await api.post('/papers/ingest_arxiv/', { url });
-    return response.data; // { paper: ..., task_id: ... }
+/**
+ * Ingests a paper directly from an arXiv URL.
+ */
+export const ingestArxiv = async (url: string): Promise<{ paper: Paper; task_id: string }> => {
+    const response = await api.post<{ paper: Paper; task_id: string }>('/papers/ingest_arxiv/', { url });
+    return response.data;
 };
 
-export const getBibTeX = async (id: string) => {
-    const response = await api.get(`/papers/${id}/export_bibtex/`);
-    return response.data; // { bibtex: ... }
+/**
+ * Exports the paper's citation in BibTeX format.
+ */
+export const getBibTeX = async (id: string): Promise<{ bibtex: string }> => {
+    const response = await api.get<{ bibtex: string }>(`/papers/${id}/export_bibtex/`);
+    return response.data;
 };
 
 // ===== COLLECTIONS API =====
@@ -174,39 +246,60 @@ export interface Collection {
     updated_at: string;
 }
 
+/**
+ * Fetches all collections.
+ */
 export const getCollections = async (): Promise<Collection[]> => {
-    const response = await api.get('/collections/');
+    const response = await api.get<any>('/collections/');
     if (response.data && response.data.results) {
         return response.data.results;
     }
-    return response.data;
+    return response.data as Collection[];
 };
 
+/**
+ * Fetches a single collection by ID.
+ */
 export const getCollection = async (id: string): Promise<Collection> => {
-    const response = await api.get(`/collections/${id}/`);
+    const response = await api.get<Collection>(`/collections/${id}/`);
     return response.data;
 };
 
+/**
+ * Creates a new collection.
+ */
 export const createCollection = async (data: { name: string; description?: string }): Promise<Collection> => {
-    const response = await api.post('/collections/', data);
+    const response = await api.post<Collection>('/collections/', data);
     return response.data;
 };
 
+/**
+ * Updates an existing collection.
+ */
 export const updateCollection = async (id: string, data: Partial<Collection>): Promise<Collection> => {
-    const response = await api.patch(`/collections/${id}/`, data);
+    const response = await api.patch<Collection>(`/collections/${id}/`, data);
     return response.data;
 };
 
+/**
+ * Deletes a collection.
+ */
 export const deleteCollection = async (id: string): Promise<void> => {
     await api.delete(`/collections/${id}/`);
 };
 
-export const addPaperToCollection = async (collectionId: string, paperId: string) => {
+/**
+ * Adds a paper to a collection.
+ */
+export const addPaperToCollection = async (collectionId: string, paperId: string): Promise<any> => {
     const response = await api.post(`/collections/${collectionId}/add_paper/`, { paper_id: paperId });
     return response.data;
 };
 
-export const removePaperFromCollection = async (collectionId: string, paperId: string) => {
+/**
+ * Removes a paper from a collection.
+ */
+export const removePaperFromCollection = async (collectionId: string, paperId: string): Promise<any> => {
     const response = await api.post(`/collections/${collectionId}/remove_paper/`, { paper_id: paperId });
     return response.data;
 };

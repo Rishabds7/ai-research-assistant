@@ -13,7 +13,8 @@ BENEFITS:
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
+
 import google.generativeai as genai
 from django.conf import settings
 from pgvector.django import CosineDistance
@@ -25,8 +26,12 @@ logger = logging.getLogger(__name__)
 class EmbeddingService:
     """
     Logic for Vector Operations using Google Generative AI.
+    Handles embedding generation, storage, and semantic search.
     """
-    def __init__(self):
+    def __init__(self) -> None:
+        """
+        Initializes the EmbeddingService with Google Gemini configuration.
+        """
         # Configure the API key from settings
         if not settings.GEMINI_API_KEY:
             logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
@@ -35,9 +40,10 @@ class EmbeddingService:
         self.model_name = "models/gemini-embedding-001"
         self._model_confirmed = False
 
-    def _ensure_model(self):
+    def _ensure_model(self) -> None:
         """
         Ensures we have a working model if we haven't already confirmed one.
+        Iterates through a priority list of models to find a working one.
         """
         if self._model_confirmed:
             return
@@ -64,6 +70,12 @@ class EmbeddingService:
         """
         Calls Google's Embedding API with fallback models.
         Returns a 768-length vector.
+        
+        Args:
+            text: The text content to embed.
+            
+        Returns:
+            List[float]: A list of floats representing the embedding vector.
         """
         if not text.strip():
             return []
@@ -88,13 +100,18 @@ class EmbeddingService:
                     task_type="retrieval_document"
                 )
                 return result['embedding']
-            except:
+            except Exception:
                 return []
 
-    def store_embeddings(self, paper_instance, sections: Dict[str, str], chunk_size: int = 1500):
+    def store_embeddings(self, paper_instance: Any, sections: Dict[str, str], chunk_size: int = 1500) -> None:
         """
         Splits paper into chunks and stores their Google embeddings in PostgreSQL.
         Uses batching to stay fast and avoid rate limits.
+        
+        Args:
+            paper_instance: The Paper model instance.
+            sections: Dictionary of section names and their content.
+            chunk_size: Maximum character length for each text chunk.
         """
         # Ensure we have a working model first
         self._ensure_model()
@@ -166,7 +183,7 @@ class EmbeddingService:
                                     embedding=vec
                                 )
                             )
-                    except:
+                    except Exception:
                         continue
 
         if embeddings_to_create:
@@ -176,6 +193,13 @@ class EmbeddingService:
     def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
         """
         Semantic search using Google's embedding for the query.
+        
+        Args:
+            query: The search query string.
+            k: Number of results to return.
+            
+        Returns:
+            List[Dict[str, Any]]: List of search results with metadata and distance.
         """
         try:
             result = genai.embed_content(
