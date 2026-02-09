@@ -171,7 +171,7 @@ export default function Home() {
               />
             </div>
             <div className="space-y-0.5">
-              <h1 className="text-4xl font-extrabold tracking-tight text-[#1A365D] animate-shimmer">
+              <h1 className="text-4xl font-extrabold tracking-tight text-[#1A365D]">
                 PaperDigest <span className="text-[#D4AF37]">AI</span>
               </h1>
               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em] opacity-80">
@@ -238,7 +238,7 @@ export default function Home() {
             <TabsList className="bg-emerald-50/80 backdrop-blur-sm p-1.5 rounded-2xl border border-emerald-200 shadow-sm">
               <TabsTrigger
                 value="papers"
-                className="px-10 py-3 rounded-xl data-[state=active]:bg-[#1A365D] data-[state=active]:text-white data-[state=active]:shadow-lg transition-all font-extrabold tracking-tight group"
+                className="px-10 py-3 rounded-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all font-extrabold tracking-tight group"
               >
                 <div className="flex items-center gap-2">
                   <span className="opacity-70 group-data-[state=active]:opacity-100">📄</span>
@@ -256,7 +256,7 @@ export default function Home() {
               </TabsTrigger>
               <TabsTrigger
                 value="collections"
-                className="px-10 py-3 rounded-xl data-[state=active]:bg-[#10B981] data-[state=active]:text-white data-[state=active]:shadow-lg transition-all font-extrabold tracking-tight group"
+                className="px-10 py-3 rounded-xl data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all font-extrabold tracking-tight group"
               >
                 <div className="flex items-center gap-2">
                   <span className="opacity-70 group-data-[state=active]:opacity-100">📁</span>
@@ -270,7 +270,7 @@ export default function Home() {
                 variant="outline"
                 size="sm"
                 onClick={handleDeleteAll}
-                className="bg-emerald-100/80 border-emerald-200 text-red-500 hover:text-red-700 hover:bg-emerald-200 hover:border-emerald-300 transition-all font-bold px-4 h-10 rounded-xl flex items-center gap-2"
+                className="bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700 hover:border-emerald-800 transition-all font-bold px-4 h-10 rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete All

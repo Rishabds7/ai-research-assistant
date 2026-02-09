@@ -287,7 +287,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
 
     return (
         <Card ref={cardRef} className="bg-white shadow-xl rounded-2xl overflow-hidden border-2 border-[#F1E9D2] transition-all duration-500 hover:shadow-2xl hover:border-[#D4AF37]/30">
-            <CardHeader className="bg-linear-to-br from-emerald-50 via-emerald-50/50 to-emerald-100/30 border-b-2 border-emerald-200/60 pb-7 pt-8 px-10">
+            <CardHeader className="bg-white border-b-2 border-slate-100 pb-7 pt-8 px-10">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-5">
                         <div className="bg-[#1A365D] p-3 rounded-xl shadow-lg shadow-blue-900/10 transform transition-transform group-hover:scale-105">
@@ -335,7 +335,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`rounded-lg gap-2 text-xs font-semibold ${showPdf ? "bg-[#1A365D] text-white hover:bg-[#1A365D]" : "text-[#1A365D] hover:bg-[#F1E9D2]/30"}`}
+                                    className={`rounded-lg gap-2 text-xs font-bold ${showPdf ? "bg-emerald-700 text-white hover:bg-emerald-800" : "text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300"}`}
                                     onClick={() => setShowPdf(!showPdf)}
                                 >
                                     <Eye className="h-3.5 w-3.5" />
@@ -344,7 +344,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
+                                    className="rounded-lg gap-2 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 transition-all"
                                     onClick={() => {
                                         if (!paper.section_summaries || paper.section_summaries.length === 0) {
                                             handleSummarize();
@@ -360,7 +360,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
+                                    className="rounded-lg gap-2 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 transition-all"
                                     onClick={() => {
                                         handleExtractMetadata('datasets');
                                         setTimeout(() => scrollToSection(datasetsRef), 100);
@@ -373,7 +373,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
+                                    className="rounded-lg gap-2 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 transition-all"
                                     onClick={() => {
                                         handleExtractMetadata('licenses');
                                         setTimeout(() => scrollToSection(licensesRef), 100);
@@ -386,7 +386,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
+                                    className="rounded-lg gap-2 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 transition-all"
                                     onClick={handleOpenCitationModal}
                                 >
                                     <Download className="h-3.5 w-3.5" />
@@ -397,7 +397,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="rounded-lg gap-2 text-xs font-semibold text-[#1A365D] hover:bg-[#F1E9D2]/30"
+                                            className="rounded-lg gap-2 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 transition-all"
                                             onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
                                             disabled={addingToCollection}
                                         >
