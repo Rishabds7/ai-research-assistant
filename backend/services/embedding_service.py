@@ -49,11 +49,10 @@ class EmbeddingService:
             return
 
         test_text = "test"
-        # Try our known list
+        # Only use 768-dimension models (text-embedding-004 returns 3072 dims - incompatible!)
         models_to_try = [
-            "models/gemini-embedding-001", # Priority 1
-            "models/text-embedding-004",   # Priority 2
-            "models/embedding-001"         # Priority 3
+            "models/gemini-embedding-001", # Priority 1 (768 dims)
+            "models/embedding-001"         # Priority 2 (768 dims)
         ]
         
         for model in models_to_try:
