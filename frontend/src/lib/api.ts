@@ -100,7 +100,7 @@ export interface TaskByIdResponse {
 export interface TaskStatusResponse {
     task_id: string;
     task_type: string; // 'process_pdf', 'summarize', etc.
-    status: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | 'RETRY' | 'REVOKED';
+    status: 'pending' | 'running' | 'completed' | 'failed' | 'timeout';
     result?: any;
     error?: string;
     created_at: string;

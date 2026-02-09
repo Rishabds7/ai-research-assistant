@@ -655,7 +655,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                             >
                                                 <button
                                                     onClick={(e) => toggleSection(s.section_name, e.currentTarget.parentElement as HTMLElement)}
-                                                    className={`w-full flex items-center justify-between px-6 py-5 text-left transition-colors ${isExpanded ? "bg-[#FDFBF7]" : "bg-white hover:bg-[#FDFBF7]/30"}`}
+                                                    // Darker background for expanded header
+                                                    className={`w-full flex items-center justify-between px-6 py-5 text-left transition-colors ${isExpanded ? "bg-[#F5F2E6]" : "bg-white hover:bg-[#F9F6ED]"}`}
                                                 >
                                                     <span className={`text-sm font-extrabold tracking-tight capitalize ${isExpanded ? "text-[#D4AF37]" : "text-[#1A365D]"}`}>
                                                         {s.section_name}
@@ -663,7 +664,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                                     <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "rotate-180 text-[#D4AF37]" : "text-slate-300"}`} />
                                                 </button>
                                                 {isExpanded && (
-                                                    <div className="px-10 py-8 bg-[#FCF9F1]/30 border-t border-[#F1E9D2]/50">
+                                                    // Darker background for content area
+                                                    <div className="px-10 py-8 bg-[#F5F2E6]/50 border-t border-[#F1E9D2]">
                                                         <ul className="space-y-6">
                                                             {(() => {
                                                                 const lines = s.summary.split(/\r?\n/).filter(Boolean);
@@ -673,7 +675,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                                                     if (cleanPoint.match(/^(here (is|are)|summary|global synthesis|key points|findings|overview)/i)) return null;
 
                                                                     return (
-                                                                        <li key={i} className="flex gap-4 text-[13px] text-slate-700 leading-relaxed group">
+                                                                        <li key={i} className="flex gap-4 text-[13px] text-slate-900 font-medium leading-relaxed group">
                                                                             <div className="mt-1.5 shrink-0">
                                                                                 <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
                                                                             </div>
@@ -685,7 +687,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                                                 if (points.length === 0) {
                                                                     // Fallback: Show raw summary if no points were extracted (e.g. single paragraph)
                                                                     return (
-                                                                        <li className="flex gap-4 text-[13px] text-slate-700 leading-relaxed group">
+                                                                        <li className="flex gap-4 text-[13px] text-slate-900 font-medium leading-relaxed group">
                                                                             <div className="mt-1.5 shrink-0">
                                                                                 <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] group-hover:scale-125 transition-transform" />
                                                                             </div>
