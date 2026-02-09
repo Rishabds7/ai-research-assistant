@@ -73,6 +73,7 @@ export interface Paper {
         summarize?: string;
         datasets?: string;
         licenses?: string;
+        swot_analysis?: string;
     };
     uploadTaskId?: string;
     title?: string;

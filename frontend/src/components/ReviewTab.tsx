@@ -2,6 +2,7 @@
 
 import { Paper, updatePaper, Collection, getCollections, analyzeSwot } from "@/lib/api";
 import React, { useState, useEffect, useRef } from "react";
+import { useTaskPoll } from "@/hooks/useTaskPoll";
 import { Download, ChevronDown, FileText, Calendar, Users, ExternalLink, Loader2, BookOpen, AlertCircle, FileEdit, X, FolderOpen, Lightbulb, ChevronUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
@@ -40,8 +41,6 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
     const [collections, setCollections] = useState<Collection[]>([]);
     const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
     const [swotExpanded, setSwotExpanded] = useState<Set<string>>(new Set());
-    const [swotTaskIds, setSwotTaskIds] = useState<Record<string, string>>({});
-    const [swotInitiating, setSwotInitiating] = useState<Record<string, boolean>>({});
 
     // Fetch collections on mount
     useEffect(() => {
@@ -95,6 +94,22 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
         });
     };
 
+    // Helper component that polls for SWOT analysis completion
+    const SwotPollingWrapper = ({ paper }: { paper: Paper }) => {
+        const swotTaskId = paper.task_ids?.swot_analysis;
+        const isPolling = swotTaskId && !paper.swot_analysis;
+
+        useTaskPoll(
+            isPolling ? swotTaskId : null,
+            () => {
+                // On task completion, refresh papers to get the swot_analysis field
+                onUpdate();
+            }
+        );
+
+        return null;
+    };
+
     const handleEditNotes = (paper: Paper) => {
         setEditingPaper(paper);
         setNotes(paper.notes || "");
@@ -114,40 +129,15 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
 
     const handleSwotAnalyze = async (paperId: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (swotTaskIds[paperId] || swotInitiating[paperId]) return;
-
-        setSwotInitiating(prev => ({ ...prev, [paperId]: true }));
         setSwotExpanded(prev => new Set(prev).add(paperId));
 
         try {
-            const data = await analyzeSwot(paperId);
-            setSwotTaskIds(prev => ({ ...prev, [paperId]: data.task_id }));
-
-            // Poll for completion
-            const pollInterval = setInterval(async () => {
-                try {
-                    // Refresh paper data to check if swot_analysis is populated
-                    onUpdate();
-                    const updatedPaper = papers.find(p => p.id === paperId);
-                    if (updatedPaper?.swot_analysis) {
-                        clearInterval(pollInterval);
-                        setSwotTaskIds(prev => {
-                            const next = { ...prev };
-                            delete next[paperId];
-                            return next;
-                        });
-                        setSwotInitiating(prev => ({ ...prev, [paperId]: false }));
-                    }
-                } catch (error) {
-                    console.error('Polling error:', error);
-                }
-            }, 3000);
-
-            // Cleanup after 5 minutes
-            setTimeout(() => clearInterval(pollInterval), 300000);
+            await analyzeSwot(paperId);
+            // Trigger update to get the new task_id from backend
+            onUpdate();
         } catch (error) {
             console.error('Failed to start SWOT analysis:', error);
-            setSwotInitiating(prev => ({ ...prev, [paperId]: false }));
+            alert('Failed to start SWOT analysis. Please try again.');
         }
     };
 
@@ -316,13 +306,14 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
                                                         </ul>
 
                                                         {/* SWOT Analysis Section */}
+                                                        <SwotPollingWrapper paper={paper} />
                                                         <div className="mt-8 pt-6 border-t border-[#F1E9D2]/50">
-                                                            {paper.swot_analysis || swotTaskIds[paper.id] || swotInitiating[paper.id] ? (
+                                                            {paper.swot_analysis || paper.task_ids?.swot_analysis ? (
                                                                 <div>
                                                                     {/* eslint-disable-next-line */}
                                                                     <button
                                                                         onClick={(e) => toggleSwot(paper.id, e)}
-                                                                        className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-200 hover:from-emerald-100 hover:to-teal-100 transition-all"
+                                                                        className="w-full flex items-center justify-between p-4 bg-linear-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-200 hover:from-emerald-100 hover:to-teal-100 transition-all"
                                                                     >
                                                                         <div className="flex items-center gap-2">
                                                                             <Lightbulb className="h-5 w-5 text-emerald-600" />
@@ -337,7 +328,7 @@ export function ReviewTab({ papers, onUpdate }: ReviewTabProps) {
 
                                                                     {swotExpanded.has(paper.id) && (
                                                                         <div className="mt-3 p-6 bg-white rounded-lg border border-emerald-100">
-                                                                            {swotTaskIds[paper.id] ? (
+                                                                            {paper.task_ids?.swot_analysis && !paper.swot_analysis ? (
                                                                                 <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-lg">
                                                                                     <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
                                                                                     <span className="text-sm text-emerald-700 font-medium">Analyzing strengths, weaknesses, opportunities, and threats...</span>
