@@ -324,12 +324,16 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                         {/* Papers in Collection */}
                         {selectedCollection.papers && selectedCollection.papers.length > 0 ? (
                             <div className="space-y-2">
-                                {selectedCollection.papers.map((paper) => (
+                                {selectedCollection.papers.map((paper, index) => (
                                     <div
                                         key={paper.id}
                                         className="flex justify-between items-center p-3 rounded-lg border border-[#F1E9D2] bg-white hover:bg-[#FDFBF7]/50 transition-colors"
                                     >
-                                        <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[#1A365D] flex items-center justify-center">
+                                                <span className="text-xs font-extrabold text-white">{index + 1}</span>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
                                             <p className="text-sm font-bold text-[#1A365D] truncate">
                                                 {(!paper.title || paper.title === 'Unknown') ? paper.filename : paper.title}
                                             </p>
@@ -345,6 +349,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                                     })()}
                                                 </p>
                                             )}
+                                        </div>
                                         </div>
                                         <Button
                                             size="sm"
