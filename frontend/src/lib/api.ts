@@ -202,6 +202,23 @@ export const deleteAllPapers = async (): Promise<void> => {
 };
 
 /**
+ * Deletes ALL collections. 
+ * WARNING: Destructive action.
+ */
+export const deleteAllCollections = async (): Promise<void> => {
+    await api.post('/collections/delete_all/');
+};
+
+/**
+ * Triggers gap analysis for a collection.
+ * @param collectionId Collection ID
+ */
+export const analyzeCollectionGaps = async (collectionId: string): Promise<TaskByIdResponse> => {
+    const response = await api.post<TaskByIdResponse>(`/collections/${collectionId}/analyze_gaps/`);
+    return response.data;
+};
+
+/**
  * Updates paper metadata (notes, title, etc.).
  */
 export const updatePaper = async (id: string, data: Partial<Paper>): Promise<Paper> => {
@@ -242,6 +259,8 @@ export interface Collection {
     paper_count?: number;
     paper_ids?: string[];  // For duplicate detection
     papers?: Paper[];      // Only in detail view
+    gap_analysis?: string;
+    gap_analysis_updated_at?: string;
     created_at: string;
     updated_at: string;
 }

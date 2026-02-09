@@ -310,3 +310,80 @@ def extract_metadata_task(self, paper_id: str, field: str) -> Dict[str, Any]:
     except Exception as e:
         update_task_status(task_id, 'failed', error=str(e))
         raise
+
+@shared_task(bind=True)
+def analyze_collection_gaps_task(self, collection_id: str) -> Dict[str, str]:
+    """
+    MULTI-PAPER RESEARCH GAP ANALYSIS (Map-Reduce Pattern).
+    
+    Analyzes multiple papers in a collection to identify research gaps.
+    This demonstrates multi-document reasoning, a key skill for senior AI roles.
+    
+    Map Phase: Extract conclusions/future work from each paper
+    Reduce Phase: LLM synthesizes common gaps
+    
+    Args:
+        collection_id: UUID of the Collection.
+        
+    Returns:
+        Dict: Gap analysis result with 'gap_analysis' key.
+    """
+    task_id = self.request.id
+    update_task_status(task_id, 'running')
+    
+    try:
+        from .models import Collection
+        from django.utils import timezone
+        
+        collection = Collection.objects.get(id=collection_id)
+        papers = collection.papers.filter(processed=True)
+        
+        if papers.count() < 2:
+            error_msg = "Need at least 2 processed papers for gap analysis."
+            update_task_status(task_id, 'failed', error=error_msg)
+            return {'error': error_msg}
+        
+        # MAP PHASE: Extract relevant sections from each paper
+        paper_contexts = []
+        for paper in papers:
+            sections = paper.sections or {}
+            sections_lower = {k.lower(): v for k, v in sections.items()}
+            
+            # Extract key sections
+            future_work = (
+                sections_lower.get('future work', '') or
+                sections_lower.get('future directions', '') or
+                sections_lower.get('discussion', '')[:2000]
+            )
+            
+            conclusion = (
+                sections_lower.get('conclusion', '') or
+                sections_lower.get('conclusions', '') or
+                paper.full_text[-3000:] if paper.full_text else ''
+            )
+            
+            limitations = sections_lower.get('limitations', '')
+            
+            paper_contexts.append({
+                'title': paper.title or paper.filename,
+                'future_work': future_work[:3000],
+                'conclusion': conclusion[:3000],
+                'limitations': limitations[:2000]
+            })
+        
+        # REDUCE PHASE: LLM synthesis
+        llm = LLMService()
+        gap_analysis = llm.analyze_research_gaps(paper_contexts)
+        
+        # Save to collection
+        collection.gap_analysis = sanitize_text(gap_analysis)
+        collection.gap_analysis_updated_at = timezone.now()
+        collection.save(update_fields=['gap_analysis', 'gap_analysis_updated_at'])
+        
+        update_task_status(task_id, 'completed', result={'gap_analysis': gap_analysis})
+        return {'gap_analysis': gap_analysis}
+        
+    except Exception as e:
+        logger.error(f"Gap analysis task {task_id} failed: {e}")
+        update_task_status(task_id, 'failed', error=str(e))
+        raise

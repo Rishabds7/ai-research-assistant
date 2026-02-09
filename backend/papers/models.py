@@ -94,6 +94,11 @@ class Collection(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     papers = models.ManyToManyField(Paper, related_name='collections', blank=True)
+    
+    # Research Gap Analysis (NEW FEATURE)
+    gap_analysis = models.TextField(blank=True)
+    gap_analysis_updated_at = models.DateTimeField(null=True, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

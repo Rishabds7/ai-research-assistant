@@ -24,7 +24,7 @@ class CollectionListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Collection
-        fields = ['id', 'name', 'description', 'paper_count', 'paper_ids', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'paper_count', 'paper_ids', 'gap_analysis', 'gap_analysis_updated_at', 'created_at', 'updated_at']
     
     def get_paper_count(self, obj: Collection) -> int:
         """Returns the total number of papers in the collection."""
@@ -43,7 +43,7 @@ class CollectionDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Collection
-        fields = ['id', 'name', 'description', 'papers', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'papers', 'gap_analysis', 'gap_analysis_updated_at', 'created_at', 'updated_at']
     
     def get_papers(self, obj: Collection) -> List[Dict[str, Any]]:
         """

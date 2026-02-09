@@ -471,6 +471,41 @@ class CollectionViewSet(viewsets.ModelViewSet):
             'collection_id': str(collection.id),
             'paper_id': str(paper.id)
         })
+    
+    @action(detail=True, methods=['post'])
+    def analyze_gaps(self, request: Request, pk: Optional[str] = None) -> Response:
+        """
+        Triggers Research Gap Analysis for this collection.
+        POST /api/collections/{id}/analyze_gaps/
+        
+        Args:
+            request: HTTP Request.
+            pk: UUID of the collection.
+            
+        Returns:
+            Response: JSON with task_id for polling.
+        """
+        from .tasks import analyze_collection_gaps_task
+        
+        collection = self.get_object()
+        
+        # Validate: Need at least 2 processed papers
+        processed_count = collection.papers.filter(processed=True).count()
+        if processed_count < 2:
+            return Response({
+                'error': f'Need at least 2 processed papers for gap analysis. Found: {processed_count}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Trigger async task
+        task = analyze_collection_gaps_task.delay(str(collection.id))
+        
+        TaskStatus.objects.create(
+            task_id=task.id,
+            task_type='analyze_gaps',
+            status='pending'
+        )
+        
+        return Response({'task_id': task.id})
 
 
 class PingView(views.APIView):

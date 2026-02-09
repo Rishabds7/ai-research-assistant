@@ -52,6 +52,7 @@ class LLMBackend(Protocol):
     def extract_licenses(self, paper_text: str) -> List[str]: ...
     def extract_paper_info(self, context: str) -> Dict[str, str]: ...
     def generate_global_summary(self, section_summaries: Dict[str, str]) -> str: ...
+    def analyze_research_gaps(self, paper_contexts: List[Dict[str, str]]) -> str: ...
 
 
 def _strip_json_markdown(raw: str) -> str:
@@ -485,6 +486,61 @@ Snippets:
         raw = self._generate(prompt)
         result = _parse_json_safe(raw, ["None mentioned"])
         return result if result else ["None mentioned"]
+    
+    def analyze_research_gaps(self, paper_contexts: List[Dict[str, str]]) -> str:
+        """Identical to Gemini implementation - delegates to Ollama."""
+        if not paper_contexts or len(paper_contexts) < 2:
+            return "Need at least 2 papers for meaningful gap analysis."
+        
+        papers_summary = []
+        for i, ctx in enumerate(paper_contexts, 1):
+            title = ctx.get('title', f'Paper {i}')
+            future_work = ctx.get('future_work', '')
+            conclusion = ctx.get('conclusion', '')
+            limitations = ctx.get('limitations', '')
+            
+            paper_text = f"**Paper {i}: {title}**\n"
+            if conclusion:
+                paper_text += f"Conclusion: {conclusion[:1500]}\n"
+            if future_work:
+                paper_text += f"Future Work: {future_work[:1500]}\n"
+            if limitations:
+                paper_text += f"Limitations: {limitations[:1000]}\n"
+            
+            papers_summary.append(paper_text)
+        
+        prompt = f"""You are a research analyst identifying gaps across multiple academic papers.
+
+**Your Task:**
+Analyze the following papers and provide:
+1. **Common Themes**: What research areas do these papers collectively address?
+2. **Research Gaps**: What questions remain unanswered? What hasn't been explored?
+3. **Future Directions**: What are the most promising next steps?
+
+**Papers:**
+{'\n\n---\n\n'.join(papers_summary)}
+
+**Output Format** (Markdown with bullet points):
+##  Common Themes
+- [Theme 1]
+- [Theme 2]
+
+## Identified Research Gaps
+- [Gap 1]
+- [Gap 2]
+
+## Suggested Future Directions
+- [Direction 1]
+- [Direction 2]
+
+**Important:**
+- If papers cover completely different domains, state: "Papers cover different research areas with minimal overlap."
+- Focus on ACTIONABLE gaps (specific experiments, datasets, methods not yet tried)
+- Be concise (3-5 points per section)
+"""
+        
+        result = self._generate(prompt=prompt, temperature=0.4, max_tokens=2000)
+        return clean_llm_summary(result) if result else "Failed to generate gap analysis."
 
     def extract_licenses(self, paper_text: str) -> List[str]:
         """
@@ -879,6 +935,83 @@ Snippets:
                     licenses.append(lic)
                     seen.add(lic.lower())
         return licenses
+
+    def analyze_research_gaps(self, paper_contexts: List[Dict[str, str]]) -> str:
+        """
+        MAP-REDUCE RESEARCH GAP ANALYSIS.
+        Analyzes multiple papers to identify unexplored research areas.
+        
+        This method implements a multi-document synthesis pattern:
+        - Map: Extract conclusions/future work from each paper
+        - Reduce: Synthesize common gaps and opportunities
+        
+        Args:
+            paper_contexts: List of dicts with keys:
+                - 'title': Paper title
+                - 'future_work': Future work section text
+                - 'conclusion': Conclusion section text
+                - 'limitations': Limitations section text (optional)
+        
+        Returns:
+            str: Markdown-formatted gap analysis with:
+                - Common themes across papers
+                - Identified research gaps
+                - Suggested future directions
+        """
+        if not paper_contexts or len(paper_contexts) < 2:
+            return "Need at least 2 papers for meaningful gap analysis."
+        
+        # Build context from all papers (Map phase)
+        papers_summary = []
+        for i, ctx in enumerate(paper_contexts, 1):
+            title = ctx.get('title', f'Paper {i}')
+            future_work = ctx.get('future_work', '')
+            conclusion = ctx.get('conclusion', '')
+            limitations = ctx.get('limitations', '')
+            
+            paper_text = f"**Paper {i}: {title}**\n"
+            if conclusion:
+                paper_text += f"Conclusion: {conclusion[:1500]}\n"
+            if future_work:
+                paper_text += f"Future Work: {future_work[:1500]}\n"
+            if limitations:
+                paper_text += f"Limitations: {limitations[:1000]}\n"
+            
+            papers_summary.append(paper_text)
+        
+        # Reduce phase: LLM synthesizes gaps
+        prompt = f"""You are a research analyst identifying gaps across multiple academic papers.
+
+**Your Task:**
+Analyze the following papers and provide:
+1. **Common Themes**: What research areas do these papers collectively address?
+2. **Research Gaps**: What questions remain unanswered? What hasn't been explored?
+3. **Future Directions**: What are the most promising next steps?
+
+**Papers:**
+{'\n\n---\n\n'.join(papers_summary)}
+
+**Output Format** (Markdown with bullet points):
+## Common Themes
+- [Theme 1]
+- [Theme 2]
+
+## Identified Research Gaps
+- [Gap 1]
+- [Gap 2]
+
+## Suggested Future Directions
+- [Direction 1]
+- [Direction 2]
+
+**Important:**
+- If papers cover completely different domains, state: "Papers cover different research areas with minimal overlap."
+- Focus on ACTIONABLE gaps (specific experiments, datasets, methods not yet tried)
+- Be concise (3-5 points per section)
+"""
+        
+        result = self._generate(prompt=prompt, temperature=0.4, max_tokens=2000)
+        return clean_llm_summary(result) if result else "Failed to generate gap analysis."
 
     def summarize_sections(self, sections: Dict[str, str], full_text: str = "") -> Dict[str, str]:
         """

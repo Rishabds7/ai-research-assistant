@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Collection, getCollections, createCollection, deleteCollection, addPaperToCollection, removePaperFromCollection, Paper } from '@/lib/api';
+import { Collection, getCollections, createCollection, deleteCollection, addPaperToCollection, removePaperFromCollection, Paper, analyzeCollectionGaps } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, FolderOpen, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Plus, FolderOpen, X, Check, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
 
 interface CollectionsTabProps {
     papers: Paper[];
@@ -20,6 +20,8 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
     const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
     const [isAdding, setIsAdding] = useState(false);
     const [showAddPapers, setShowAddPapers] = useState(false);
+    const [gapAnalysisTaskId, setGapAnalysisTaskId] = useState<string | null>(null);
+    const [isGapAnalysisExpanded, setIsGapAnalysisExpanded] = useState(false);
 
     const fetchCollections = async () => {
         try {
@@ -125,6 +127,44 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
         if (!selectedCollection?.papers) return false;
         return selectedCollection.papers.some(p => p.id === paperId);
     };
+
+    const handleAnalyzeGaps = async () => {
+        if (!selectedCollection) return;
+
+        try {
+            const response = await analyzeCollectionGaps(selectedCollection.id);
+            setGapAnalysisTaskId(response.task_id);
+            setIsGapAnalysisExpanded(true);
+        } catch (error: any) {
+            console.error('Failed to trigger gap analysis:', error);
+            alert(error.response?.data?.error || 'Failed to start gap analysis');
+        }
+    };
+
+    // Poll for gap analysis completion
+    useEffect(() => {
+        if (!gapAnalysisTaskId) return;
+
+        const pollTaskStatus = async () => {
+            try {
+                const { getTaskStatus } = await import('@/lib/api');
+                const status = await getTaskStatus(gapAnalysisTaskId);
+
+                if (status.status === 'completed') {
+                    setGapAnalysisTaskId(null);
+                    fetchCollections(); // Refresh to get updated gap_analysis
+                } else if (status.status === 'failed') {
+                    setGapAnalysisTaskId(null);
+                    alert('Gap analysis failed: ' + (status.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to poll task status:', error);
+            }
+        };
+
+        const interval = setInterval(pollTaskStatus, 2000);
+        return () => clearInterval(interval);
+    }, [gapAnalysisTaskId]);
 
     const handleCollectionClick = async (collection: Collection) => {
         try {
@@ -384,6 +424,61 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                 </div>
                             )}
                         </div>
+
+                        {/* Gap Analysis Section */}
+                        {selectedCollection.papers && selectedCollection.papers.length >= 2 && (
+                            <div className="border-t border-[#F1E9D2] pt-4">
+                                <Button
+                                    onClick={handleAnalyzeGaps}
+                                    disabled={!!gapAnalysisTaskId}
+                                    className="w-full bg-gradient-to-r from-[#1A365D] to-[#2A4A7D] hover:from-[#0F172A] hover:to-[#1A365D] text-white font-bold"
+                                >
+                                    <Lightbulb className={`h-4 w-4 mr-2 ${gapAnalysisTaskId ? 'animate-pulse' : ''}`} />
+                                    {gapAnalysisTaskId ? 'Analyzing Research Gaps...' : 'Analyze Research Gaps'}
+                                </Button>
+
+                                {/* Gap Analysis Results */}
+                                {selectedCollection.gap_analysis && (
+                                    <div className="mt-4">
+                                        <button
+                                            onClick={() => setIsGapAnalysisExpanded(!isGapAnalysisExpanded)}
+                                            className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#1A365D]/5 to-[#2A4A7D]/5 rounded-lg border border-[#1A365D]/20 hover:bg-gradient-to-r hover:from-[#1A365D]/10 hover:to-[#2A4A7D]/10 transition-all"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <Lightbulb className="h-5 w-5 text-[#D4AF37]" />
+                                                <span className="font-extrabold text-[#1A365D]">Research Gap Analysis</span>
+                                            </div>
+                                            {isGapAnalysisExpanded ? (
+                                                <ChevronUp className="h-5 w-5 text-[#1A365D]" />
+                                            ) : (
+                                                <ChevronDown className="h-5 w-5 text-[#1A365D]" />
+                                            )}
+                                        </button>
+
+                                        {isGapAnalysisExpanded && (
+                                            <div className="mt-3 p-6 bg-white rounded-lg border border-[#F1E9D2]">
+                                                <div className="prose prose-sm max-w-none">
+                                                    <div
+                                                        className="text-[13px] text-slate-700 leading-relaxed"
+                                                        dangerouslySetInnerHTML={{
+                                                            __html: selectedCollection.gap_analysis
+                                                                .replace(/^##\s+(.+)$/gm, '<h3 class="text-base font-extrabold text-[#1A365D] mt-4 mb-2">$1</h3>')
+                                                                .replace(/^-\s+(.+)$/gm, '<li class="ml-4">$1</li>')
+                                                                .replace(/(<li.*<\/li>)/s, '<ul class="list-disc space-y-1">$1</ul>')
+                                                        }}
+                                                    />
+                                                </div>
+                                                {selectedCollection.gap_analysis_updated_at && (
+                                                    <p className="text-xs text-slate-400 mt-4 pt-4 border-t border-[#F1E9D2]">
+                                                        Last analyzed: {new Date(selectedCollection.gap_analysis_updated_at).toLocaleString()}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             )}
