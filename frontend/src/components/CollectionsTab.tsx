@@ -464,8 +464,8 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                 </div>
                             )}
 
-                            {/* Gap Analysis Results */}
-                            {selectedCollection.gap_analysis && (
+                            {/* Gap Analysis Results - Only show if we have 2+ papers */}
+                            {selectedCollection.gap_analysis && selectedCollection.papers && selectedCollection.papers.length >= 2 && (
                                 <div className="mt-4">
                                     {/* eslint-disable-next-line */}
                                     <button
