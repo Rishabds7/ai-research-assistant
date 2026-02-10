@@ -411,6 +411,16 @@ class GeminiLLMService:
                 error_str = str(e)
                 # Check for 429 Resource Exhausted (Google API or gRPC error)
                 is_429 = "429" in error_str or "Resource exhausted" in error_str
+                is_404 = "404" in error_str or "not found" in error_str.lower()
+
+                if is_404:
+                     logger.error(f"Gemini Model {self.model._model_name} not found (404). Switching to fallback: gemini-1.5-flash")
+                     self.model = genai.GenerativeModel(
+                        model_name="gemini-1.5-flash",
+                        generation_config={"temperature": 0.1}
+                     )
+                     # Retry immediately with new model
+                     continue # will retry with new self.model
                 
                 if is_429:
                     if attempt < max_retries:
@@ -430,7 +440,7 @@ class GeminiLLMService:
                         logger.error(f"Gemini rate limit exhausted after {max_retries} attempts.")
                         return None
                 else:
-                    # For non-429 errors (500, 503, etc), retry a few times then fail
+                    # For non-429/404 errors (500, 503, etc), retry a few times then fail
                     if attempt < 3: 
                         logger.warning(f"Gemini API Error: {e}. Retrying... (Attempt {attempt+1})")
                         time.sleep(5)
