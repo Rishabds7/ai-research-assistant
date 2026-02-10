@@ -127,7 +127,7 @@ Return ONLY valid JSON:
 }}"""
             
             # Use LLM's built-in extract_paper_info method
-            metadata = llm.extract_paper_info(context)
+            metadata = llm.extract_paper_info(metadata_context)
             
             # Clean and store metadata
             paper.title = sanitize_text(metadata.get('title', paper.filename) or paper.filename)
