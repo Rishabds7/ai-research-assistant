@@ -8,7 +8,7 @@ using Google's 'gemini-embedding-001' model.
 
 BENEFITS:
 - Cloud-based: No local RAM/GPU required (saves $30/mo on Render).
-- High Performance: 768-dimensional semantic density.
+- High Performance: 3072-dimensional semantic density.
 - Cost: Free tier supported via Gemini API Key.
 """
 
@@ -50,10 +50,10 @@ class EmbeddingService:
             return
 
         test_text = "test"
-        # Only use 768-dimension models (text-embedding-004 returns 3072 dims - incompatible!)
+        # Only use 3072-dimension models (text-embedding-004 returns 3072 dims natively)
         models_to_try = [
-            "models/text-embedding-004", # Priority 1 (Supports output_dimensionality=768)
-            "models/gemini-embedding-001", # Priority 2 (Native 768 dims)
+            "models/text-embedding-004", # Priority 1 (Supports 3072 dims)
+            "models/gemini-embedding-001", # Priority 2 (Native 768 dims - will be padded)
             "models/embedding-001"         # Priority 3 (Legacy)
         ]
         
@@ -64,11 +64,11 @@ class EmbeddingService:
                     model=model, 
                     content=test_text, 
                     task_type="retrieval_document",
-                    output_dimensionality=768
+                    output_dimensionality=3072
                 )
                 self.model_name = model
                 self._model_confirmed = True
-                logger.info(f"EMBEDDING: Confirmed working model: {model} (Force 768 Dims)")
+                logger.info(f"EMBEDDING: Confirmed working model: {model} (Force 3072 Dims)")
                 return
             except Exception:
                 try:
@@ -104,16 +104,19 @@ class EmbeddingService:
                 "content": text,
                 "task_type": "retrieval_document",
                 "title": "Research Paper Chunk",
-                "output_dimensionality": 768 # Force 768
+                "output_dimensionality": 3072 # Force 3072
             }
 
             result = genai.embed_content(**kwargs)
             
             # Validation check
             embedding = result['embedding']
-            if len(embedding) != 768:
-                logger.warning(f"EMBEDDING MISMATCH: Got {len(embedding)} dims, expected 768. Truncating.")
-                embedding = embedding[:768]
+            if len(embedding) != 3072:
+                logger.warning(f"EMBEDDING MISMATCH: Got {len(embedding)} dims, expected 3072. Truncating/Padding.")
+                if len(embedding) > 3072:
+                    embedding = embedding[:3072]
+                else:
+                    embedding = embedding + [0.0] * (3072 - len(embedding))
                 
             return embedding
         except Exception as e:
@@ -185,18 +188,18 @@ class EmbeddingService:
                 }
                 
                 if "text-embedding-004" in self.model_name:
-                    kwargs["output_dimensionality"] = 768
+                    kwargs["output_dimensionality"] = 3072
 
                 result = genai.embed_content(**kwargs)
                 
                 for idx, vec in enumerate(result['embedding']):
                     # Robust handling of dimension mismatch
-                    if len(vec) != 768:
-                        logger.warning(f"Batch dimension mismatch: {len(vec)}. Truncating/Padding to 768.")
-                        if len(vec) > 768:
-                            vec = vec[:768]
+                    if len(vec) != 3072:
+                        logger.warning(f"Batch dimension mismatch: {len(vec)}. Truncating/Padding to 3072.")
+                        if len(vec) > 3072:
+                            vec = vec[:3072]
                         else:
-                            vec = vec + [0.0] * (768 - len(vec))
+                            vec = vec + [0.0] * (3072 - len(vec))
                         
                     embeddings_to_create.append(
                         EmbeddingModel(
@@ -245,11 +248,11 @@ class EmbeddingService:
                 model=self.model_name,
                 content=query,
                 task_type="retrieval_query",
-                output_dimensionality=768 # Force 768 for search too
+                output_dimensionality=3072 # Force 3072 for search too
             )
             query_vec = result['embedding']
-            if len(query_vec) != 768:
-                query_vec = query_vec[:768] if len(query_vec) > 768 else query_vec + [0.0] * (768 - len(query_vec))
+            if len(query_vec) != 3072:
+                query_vec = query_vec[:3072] if len(query_vec) > 3072 else query_vec + [0.0] * (3072 - len(query_vec))
         except Exception as e:
             logger.error(f"Google Search Embedding Error: {e}")
             return []
