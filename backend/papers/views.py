@@ -133,8 +133,12 @@ class PaperViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        # Save with session_id
-        paper = serializer.save(filename=uploaded_file.name, session_id=session_id)
+        # Save with session_id and initial "Processing" hints for authors
+        paper = serializer.save(
+            filename=uploaded_file.name, 
+            session_id=session_id,
+            authors=json.dumps(["Processing..."])
+        )
         
         # Trigger processing task
         task = process_pdf_task.delay(str(paper.id))

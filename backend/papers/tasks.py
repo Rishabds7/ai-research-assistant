@@ -94,7 +94,20 @@ def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
         paper = Paper.objects.get(id=paper_id)
         processor = PDFProcessor()
         
-        # 1. Physical Extraction (CPU Bound - Fast)
+        # 1. FAST PATH: Immediate metadata extraction for UI
+        # We do this FIRST so the next polling cycle sees the title/authors
+        try:
+            fast_meta = processor.get_metadata(paper.file.path)
+            paper.title = sanitize_text(fast_meta.get("title") or paper.filename)
+            if fast_meta.get("authors"):
+                paper.authors = json.dumps(fast_meta["authors"])
+            else:
+                paper.authors = json.dumps(["Processing..."])
+            paper.save(update_fields=['title', 'authors'])
+        except Exception as e:
+            logger.warning(f"Fast-path metadata failed for {paper_id}: {e}")
+        
+        # 2. PHYSICAL EXTRACTION (CPU Bound - potentially slow for large PDFs)
         try:
             text = processor.extract_text(paper.file.path)
             if not text or len(text.strip()) < 100:
@@ -107,30 +120,19 @@ def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
             update_task_status(task_id, 'failed', error=error_msg)
             return {'error': error_msg}
 
-        # 2. Section Splitting (CPU Bound - Fast)
+        # 3. SECTION SPLITTING
         sections = processor.detect_sections(text)
         
-        # 3. Save & Mark Ready (Database Bound - Fast)
+        # 4. Save Core Data & Mark Ready
         paper.full_text = sanitize_text(text)
         paper.sections = sanitize_text(sections)
         paper.processed = True
-        
-        # Fast Metadata Extraction (Immediate feedback)
-        fast_meta = processor.get_metadata(paper.file.path)
-        paper.title = fast_meta.get("title") or paper.filename
-        if fast_meta.get("authors"):
-            paper.authors = json.dumps(fast_meta["authors"])
-        else:
-            paper.authors = json.dumps(["Processing..."])
-            
         paper.save()
         
-        # 4. Trigger Async AI Tasks (Fire & Forget)
-        # These will run in parallel if workers are available
+        # 5. Trigger Async AI Tasks (Deep Analysis)
         details_task = identify_paper_details_task.delay(paper_id)
         embed_task = generate_embeddings_task.delay(paper_id)
         
-        # Store secondary task IDs so frontend can poll them if needed
         paper.task_ids['identify_details'] = details_task.id
         paper.task_ids['generate_embeddings'] = embed_task.id
         paper.save(update_fields=['task_ids'])
@@ -189,10 +191,12 @@ Return ONLY valid JSON:
              metadata = {'title': paper.filename, 'authors': [], 'year': 'Unknown'}
 
         # Update Paper
-        paper.title = sanitize_text(metadata.get('title', paper.filename))
-        paper.authors = json.dumps(metadata.get('authors', []))
-        paper.year = sanitize_text(metadata.get('year', 'Unknown'))
-        paper.journal = sanitize_text(metadata.get('journal', 'Unknown'))
+        # ROBUSTNESS: AI sometimes returns null for journal/year. 
+        # We enforce "Unknown" to prevent DB constraint violations.
+        paper.title = sanitize_text(metadata.get('title') or paper.filename)
+        paper.authors = json.dumps(metadata.get('authors') or [])
+        paper.year = sanitize_text(metadata.get('year') or 'Unknown')
+        paper.journal = sanitize_text(metadata.get('journal') or 'Unknown')
         paper.save(update_fields=['title', 'authors', 'year', 'journal'])
         
         return metadata
