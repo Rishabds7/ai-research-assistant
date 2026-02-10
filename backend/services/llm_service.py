@@ -5,6 +5,17 @@ File: backend/services/llm_service.py
 
 This is the Brain of the application. It maps high-level research questions 
 (e.g., 'Summarize this') to specific LLM prompts.
+
+AI INTERVIEW FOCUS:
+1. Factory Pattern: We use a custom 'LLMService' class that acts as a factory. 
+   It dynamically instantiates either GeminiLLMService (Google Cloud) or 
+   OllamaLLMService (Local Llama 3) based on environment settings.
+2. Prompt Engineering: Study the 'extract_methodology' and 'smart_summarize_paper' 
+   prompts. We use 'Few-Shot' prompting and 'Chain-of-Thought' style instructions 
+   to ensure the LLM returns valid JSON.
+3. Post-Processing: We don't trust the raw LLM output. The 'clean_llm_summary' 
+   function uses Regex to strip out 'AI chatter' and meta-talk, ensuring a 
+   professional UI.
 """
 
 import json
@@ -130,27 +141,19 @@ def _parse_json_safe(raw: str, default: Any = None) -> Any:
         raise ValueError(f"Failed to parse JSON despite recovery: {e}") from e
 
 
-def clean_llm_summary(text: Union[str, List[str]]) -> str:
+def clean_llm_summary(text: str) -> str:
     """
     Aggressively removes intro/outro meta-text from the LLM. 
     Also normalizes content by merging wrapped lines and removing leading bullets.
     
     Args:
-        text: Raw summary text from LLM (string or list of strings).
+        text: Raw summary text from LLM.
         
     Returns:
         str: Cleaned, bulleted text.
     """
     if not text:
         return ""
-    
-    # Handle list inputs (sometimes LLM returns bullet points as a list)
-    if isinstance(text, list):
-        text = '\n'.join(str(item) for item in text)
-    
-    # Ensure we have a string
-    if not isinstance(text, str):
-        text = str(text)
         
     lines = text.split('\n')
     processed_points = []
@@ -380,6 +383,8 @@ class GeminiLLMService:
         if not GEMINI_API_KEY:
             logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=GEMINI_API_KEY)
+        
+        # PRO MODEL for complex reasoning (summarization, SWOT)
         self.model = genai.GenerativeModel(
             model_name=GEMINI_MODEL,
             generation_config={"temperature": 0.1}
@@ -407,6 +412,7 @@ class GeminiLLMService:
         
         Args:
             prompt: The full prompt string.
+            use_flash (bool): If True, use Flash model for faster responses.
             
         Returns:
             Optional[str]: The LLM's text response, or None if completely failed after long wait.
@@ -420,13 +426,13 @@ class GeminiLLMService:
                 time.sleep(sleep_time)
             self._last_request_time = time.time()
         
-        # INCREASED RETRIES to survive 60s+ rate limit windows
-        max_retries = 9
-        base_delay = 2 
+        # 15 retries * ~30-60s avg delay = ~10-15 minutes of patience
+        max_retries = 15
+        base_delay = 5 
 
         for attempt in range(max_retries + 1):
             try:
-                # Use flash model for fast tasks if available
+                # Use Flash model if requested and available
                 active_model = self.flash_model if (kwargs.get('use_flash') and self.flash_model) else self.model
                 response = active_model.generate_content(prompt)
                 if response.candidates and response.candidates[0].content.parts:
@@ -436,13 +442,11 @@ class GeminiLLMService:
                 error_str = str(e)
                 # Check for 429 Resource Exhausted (Google API or gRPC error)
                 is_429 = "429" in error_str or "Resource exhausted" in error_str
-                is_404 = "404" in error_str or "not found" in error_str.lower()
-
+                
                 if is_429:
                     if attempt < max_retries:
                         # Exponential backoff capped at 60s (Gemini quota resets every 60s)
-                        # 2, 4, 8, 16, 32, 60, 60, 60...
-                        # Total wait capacity > 5 minutes if needed
+                        # 5, 10, 20, 40, 60, 60, 60...
                         delay = min(60, base_delay * (2 ** attempt))
                         
                         # Add a small jitter to prevent thundering herd if multiple workers retry at once
@@ -456,7 +460,7 @@ class GeminiLLMService:
                         logger.error(f"Gemini rate limit exhausted after {max_retries} attempts.")
                         return None
                 else:
-                    # For non-429/404 errors (500, 503, etc), retry a few times then fail
+                    # For non-429 errors (500, 503, etc), retry a few times then fail
                     if attempt < 3: 
                         logger.warning(f"Gemini API Error: {e}. Retrying... (Attempt {attempt+1})")
                         time.sleep(5)
@@ -482,16 +486,16 @@ class GeminiLLMService:
 4. Journal or Conference Name (if mentioned, otherwise "Unknown")
 
 Return ONLY a JSON object with this exact structure:
-{{
+{
     "title": "Full paper title",
     "authors": ["Author One", "Author Two"],
     "year": "2024",
     "journal": "Nature / ArXiv / etc."
-}}
+}
 
 Text:
-""" + context[:15000]
-        raw = self._generate(prompt, use_flash=True)
+""" + context[:12000]
+        raw = self._generate(prompt)
         return _parse_json_safe(raw, {
             "title": "Unknown", 
             "authors": ["Unknown"], 
@@ -501,30 +505,37 @@ Text:
 
     def extract_datasets(self, context: str) -> List[str]:
         """
-        Fast dataset extraction from paper text.
-        Datasets are usually mentioned in intro/methodology sections.
+        Uses snippet-based isolation to find data sources. 
+        Better than full-text extraction for long documents as it avoids dilution.
         
         Args:
-            context: Paper text (ideally intro + methodology sections).
+            context: Combined text snippets containing dataset keywords.
             
         Returns:
             List[str]: List of dataset names.
         """
-        # Use first 25k chars (datasets are usually in intro / methodology)
-        text = context[:25000]
-        
-        prompt = """List ALL datasets and benchmarks mentioned in this research paper.
+        snippets = _extract_dataset_snippets(context)
+        snippets_text = "\n---\n".join(snippets)
+        # LLM Call for identification
+        prompt = """Extract ALL specific data sources and datasets mentioned in these snippets from a research paper.
 
-Examples: ImageNet, COCO, SQuAD, MNIST, custom datasets, etc.
+Look for:
+- Standard Benchmarks (ImageNet, SQuAD, etc.)
+- Named local/custom datasets
+- Alternative sources like specific podcasts, newsletters, or web sources.
 
-Return ONLY a JSON array: ["Dataset 1", "Dataset 2", ...]
-If none found, return: ["None mentioned"]
+Rules:
+1. Return ONLY a JSON array of specific names: ["Name1", "Name2", ...]
+2. Be specific (e.g., "ImageNet-1k" not just "ImageNet").
+3. Include names of podcasts/newsletters if explicitly mentioned.
+4. If NO specific sources or datasets are found, return ["None mentioned"].
+5. Deduplicate and normalize names.
 
-Paper text:
-""" + text
-
-        raw = self._generate(prompt, use_flash=True)
-        return _parse_json_safe(raw, ["None mentioned"])
+Snippets:
+""" + snippets_text
+        raw = self._generate(prompt)
+        result = _parse_json_safe(raw, ["None mentioned"])
+        return result if result else ["None mentioned"]
     
     def analyze_research_gaps(self, paper_contexts: List[Dict[str, str]]) -> str:
         """Identical to Gemini implementation - delegates to Ollama."""
@@ -594,8 +605,9 @@ Analyze the following papers and provide:
 
     def extract_licenses(self, paper_text: str) -> List[str]:
         """
-        Fast license extraction using targeted context.
-        Uses first 20K + last 10K chars where licenses are typically found.
+        Hyper-accurate license scanner.
+        Combines targeted snippet extraction for high-signal areas 
+        with full-text scanning for global context.
         
         Args:
             paper_text: Full text of the paper.
@@ -603,28 +615,73 @@ Analyze the following papers and provide:
         Returns:
             List[str]: List of identified licenses.
         """
-        # First 20k and last 10k contain licenses 99% of the time
-        head = paper_text[:20000]
-        tail = paper_text[-10000:] if len(paper_text) > 10000 else ""
+        # 1. Target the High-Signal areas first (Head, Tail, Acknowledgments)
+        head = paper_text[:15000].replace('\n', ' ')
+        tail = paper_text[-15000:].replace('\n', ' ')
         
-        context = f"""[BEGINNING OF PAPER]\n{head}\n\n[END OF PAPER]\n{tail}"""
+        # Look for specific structural sections in the full text
+        structural = ""
+        for section in ["acknowledgments", "appendix", "data availability", "code availability", "software availability"]:
+            match = re.search(rf"\b{section}\b", paper_text, re.IGNORECASE)
+            if match:
+                start = max(0, match.start() - 1000)
+                end = min(len(paper_text), match.end() + 5000)
+                structural += f"\n[SECTION: {section.upper()}]\n{paper_text[start:end]}\n"
+
+        # 2. Prepare the Global Context (Capped to 150k for speed/cost)
+        global_context = paper_text[:150000]
         
-        prompt = """Identify software and data licenses mentioned in this research paper.
+        prompt = """You are a professional license auditor. Analyze the paper text below and identify ALL software, data, or content licenses.
 
-Common licenses:
-- MIT License, Apache 2.0, BSD, GPL, LGPL
-- CC BY 4.0, CC BY-SA 4.0, CC BY-NC 4.0, CC0
-- Public Domain
+Rules:
+1. Return ONLY a JSON LIST of strings: ["MIT License", "CC BY 4.0", ...]
+2. ONLY include actual LEGAL LICENSES. 
+3. DO NOT include software frameworks or libraries (e.g., "TensorFlow", "PyTorch", "JAX", "NumPy")—these are NOT licenses.
+4. If NO valid licenses are found, return ["None mentioned"].
+5. Standardize names using the list of common licenses below as a reference.
 
-Return ONLY a JSON array: ["License Name 1", "License Name 2", ...]
-If no licenses found, return: ["None mentioned"]
+POSSIBLE LICENSES TO IDENTIFY:
+- Creative Commons: CC BY, CC BY-SA, CC BY-ND, CC BY-NC, CC BY-NC-SA, CC BY-NC-ND, CC0
+- Software: MIT License, Apache License 2.0, BSD 2-Clause, BSD 3-Clause, ISC License, Boost Software License 1.0, zlib License
+- GNU: GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, AGPL-3.0
+- Other: Mozilla Public License 2.0 (MPL-2.0), Eclipse Public License 2.0 (EPL-2.0), CDDL-1.0
+- Database/Data: Open Database License (ODbL), ODC-By, PDDL, Public Domain Mark
+- AI/ML Specific: CreativeML OpenRAIL-M, BigScience OpenRAIL-M, OpenRAIL-M
+- Research Terms: "available for non-commercial research", "restricted use", "citation required"
 
-Paper text:
-""" + context
+Paper Context for Deep Audit:
+---
+[BEGINNING]
+""" + head + """
 
-        raw = self._generate(prompt, use_flash=True)
-        return _parse_json_safe(raw, ["None mentioned"])
+[STRUCTURAL SECTIONS]
+""" + structural + """
 
+[END OF DOCUMENT]
+""" + tail + """
+
+[FULL PAPER SCAN (Truncated for performance)]
+""" + global_context + """
+---
+
+Return ONLY the JSON list of strings."""
+
+        raw = self._generate(prompt)
+        items = _parse_json_safe(raw, ["None mentioned"])
+        
+        # Clean results
+        cleaned = []
+        seen = set()
+        for i in items:
+            if not isinstance(i, str): continue
+            val = i.strip().strip('"').strip("'")
+            if val and val.lower() not in seen:
+                cleaned.append(val)
+                seen.add(val.lower())
+        
+        # If we got junk or empty after cleaning
+        if not cleaned: return ["None mentioned"]
+        
         # If "None mentioned" is one of many, remove it
         if len(cleaned) > 1 and "None mentioned" in cleaned:
             cleaned = [c for c in cleaned if c != "None mentioned"]
@@ -656,68 +713,6 @@ Paper text:
             else:
                 processed.append(line)
         return "\n".join(processed)
-
-    def _summarize_batch(self, mapped_sections: Dict[str, str]) -> Dict[str, str]:
-        """
-        Batch summarization optimized for Gemini 1.5 Pro (2M context).
-        Sends all sections in ONE request to save API calls and avoid 429s.
-        
-        Args:
-            mapped_sections: Dict of {SectionName: Content}
-            
-        Returns:
-            Dict: Map of {SectionName: Summary}
-        """
-        # Construct a structured prompt
-        paper_content = ""
-        for section, content in mapped_sections.items():
-            if content and len(content.strip()) > 50:
-                paper_content += f"\n--- SECTION: {section.upper()} ---\n{self._pre_clean_content(content)[:30000]}\n"
-        
-        prompt = f"""You are a senior research scientist. I will provide you with the full text of a research paper, split by sections.
-Your task is to generate a high-density technical summary for EACH section provided.
-
-**Conventions:**
-1. Return a JSON object where keys are the Section Names provided (e.g., "Abstract", "Introduction") and values are the summaries.
-2. Each summary MUST consist of 6-8 comprehensive bullet points.
-3. Each bullet point MUST start with a '-' symbol.
-4. Each bullet point MUST be a single, long-form continuous line (no newlines within a bullet).
-5. Do NOT include introductory text or meta-commentary inside the values.
-
-**Paper Content:**
-{paper_content}
-
-**Output Format:**
-{{
-    "Abstract": "- Bullet 1...\\n- Bullet 2...",
-    "Introduction": "- Bullet 1...\\n- Bullet 2...",
-    ...
-}}
-
-Return ONLY the JSON object.
-"""
-        raw = self._generate(prompt)
-        parsed = _parse_json_safe(raw)
-        
-        if not parsed or not isinstance(parsed, dict):
-            logger.warning("Batch summarization failed to parse JSON. Falling back to sequential loop.")
-            return {}
-            
-        # Post-process keys to match standard sections
-        final_summaries = {}
-        for k, v in parsed.items():
-            # Normalize key
-            norm_key = k.title()
-            if norm_key in mapped_sections:
-                final_summaries[norm_key] = clean_llm_summary(v)
-            else:
-                # Try to map loose keys back to standard ones
-                for std in mapped_sections.keys():
-                    if std.lower() in k.lower():
-                        final_summaries[std] = clean_llm_summary(v)
-                        break
-        
-        return final_summaries
 
     def summarize_sections(self, sections: Dict[str, str], full_text: str = "") -> Dict[str, str]:
         """
@@ -767,14 +762,10 @@ Return ONLY the JSON object.
             if mapped_content:
                 mapped_sections[standard_section] = '\n\n'.join(mapped_content)
         
-        # REVERT TO SEQUENTIAL: Batching with Pro model was causing timeouts and incomplete JSON on Render.
-        # We will use the Pro model's intelligence but process section-by-section for reliability.
-        if "pro" in GEMINI_MODEL.lower() or "1.5" in GEMINI_MODEL:
-            logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL} (Batching Disabled for Reliability)")
-        else:
-            logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL}")
-
+        # SMART FALLBACKS: Ensure no section is left entirely empty if full_text is available
         if full_text:
+            if not mapped_sections.get('Abstract') or len(mapped_sections['Abstract']) < 100:
+                mapped_sections['Abstract'] = full_text[:8000]
 
             if not mapped_sections.get('Introduction') or len(mapped_sections['Introduction']) < 100:
                 mapped_sections['Introduction'] = full_text[2000:15000]
@@ -804,20 +795,7 @@ Return ONLY the JSON object.
                 mapped_sections['Conclusion'] = full_text[-12000:]
         
         # Generate summaries for each standard section
-        # Generate summaries for each standard section
         summaries = {}
-        
-        # STRATEGY SWITCH: Use Batching for Gemini models (huge context)
-        # This is significantly faster as it replaces 7 sequential network calls with 1.
-        if "gemini" in LLM_PROVIDER.lower():
-            logger.info(f"Using BATCH summarization strategy for model: {GEMINI_MODEL}")
-            batch_results = self._summarize_batch(mapped_sections)
-            if batch_results:
-                return batch_results
-            logger.warning("Batch summarization failed or returned empty. Falling back to sequential.")
-            
-        logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL}")
-
         # Iterate through STANDARD_SECTIONS to maintain order and ensure we check all
         for section_name in STANDARD_SECTIONS:
             content = mapped_sections.get(section_name)
@@ -845,11 +823,10 @@ Content to summarize:
                 # Fallback: Rate limit hit. Use truncated content.
                 logger.warning(f"Rate limit hit for section '{section_name}'. Using fallback truncated text.")
                 fallback_text = content[:500].strip() + "..."
-                # Use clean text without error prefix to improve UX
-                summaries[section_name] = fallback_text
+                summaries[section_name] = f"[AI Summary Unavailable - Rate Limit]\n{fallback_text}"
             
-            # Rate limiting: Sleep 5s to stay under Gemini's ~15 RPM limit (approx 12 RPM)
-            time.sleep(5)
+            # Rate limiting: Sleep briefly to avoid hitting Gemini's RPM/TPM limits quickly
+            time.sleep(2)
         
         return summaries
 
@@ -1204,19 +1181,6 @@ Analyze the following papers and provide:
             
             if mapped_content:
                 mapped_sections[standard_section] = '\n\n'.join(mapped_content)
-
-        # Fallback Logic (Smart Slicing) if specific sections are missing
-        if full_text:
-            if not mapped_sections.get('Introduction') or len(mapped_sections['Introduction']) < 100:
-                mapped_sections['Introduction'] = full_text[1000:10000]
-            if not mapped_sections.get('Background') or len(mapped_sections['Background']) < 100:
-                mapped_sections['Background'] = full_text[int(len(full_text)*0.1):int(len(full_text)*0.3)]
-            if not mapped_sections.get('Methodology') or len(mapped_sections['Methodology']) < 100:
-                mapped_sections['Methodology'] = full_text[int(len(full_text)*0.25):int(len(full_text)*0.55)]
-            if not mapped_sections.get('Results') or len(mapped_sections['Results']) < 100:
-                mapped_sections['Results'] = full_text[int(len(full_text)*0.6):int(len(full_text)*0.9)]
-            if not mapped_sections.get('Conclusion') or len(mapped_sections['Conclusion']) < 100:
-                mapped_sections['Conclusion'] = full_text[-10000:]
         
         # Generate summaries for each standard section
         summaries = {}

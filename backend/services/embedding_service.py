@@ -13,7 +13,6 @@ BENEFITS:
 """
 
 import logging
-import tiktoken
 from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
@@ -37,7 +36,7 @@ class EmbeddingService:
         if not settings.GEMINI_API_KEY:
             logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        # Use gemini-embedding-001 which natively produces 768 dimensions
+        # Default to the most stable model as of Feb 2026
         self.model_name = "models/gemini-embedding-001"
         self._model_confirmed = False
 
@@ -50,23 +49,18 @@ class EmbeddingService:
             return
 
         test_text = "test"
-        # Use gemini-embedding-001 for native 768-dim output (no truncation needed)
+        # Only use 768-dimension models (text-embedding-004 returns 3072 dims - incompatible!)
         models_to_try = [
-            "models/gemini-embedding-001", # Priority 1 (Native 768 dims)
-            "models/embedding-001"         # Priority 2 (Legacy)
+            "models/gemini-embedding-001", # Priority 1 (768 dims)
+            "models/embedding-001"         # Priority 2 (768 dims)
         ]
         
         for model in models_to_try:
             try:
-                # No output_dimensionality needed - native 768
-                genai.embed_content(
-                    model=model, 
-                    content=test_text, 
-                    task_type="retrieval_document"
-                )
+                genai.embed_content(model=model, content=test_text, task_type="retrieval_document")
                 self.model_name = model
                 self._model_confirmed = True
-                logger.info(f"EMBEDDING: Confirmed working model: {model} (Native 768 Dims)")
+                logger.info(f"EMBEDDING: Confirmed working model: {model}")
                 return
             except Exception:
                 continue
@@ -88,27 +82,13 @@ class EmbeddingService:
         self._ensure_model()
         
         try:
-            # Prepare kwargs - add dimensionality for new models
-            kwargs = {
-                "model": self.model_name,
-                "content": text,
-                "task_type": "retrieval_document",
-                "title": "Research Paper Chunk"
-                # No output_dimensionality - gemini-embedding-001 is native 768
-            }
-
-            result = genai.embed_content(**kwargs)
-            
-            # Validation check
-            embedding = result['embedding']
-            if len(embedding) != 768:
-                logger.warning(f"EMBEDDING MISMATCH: Got {len(embedding)} dims, expected 768. Truncating/Padding.")
-                if len(embedding) > 768:
-                    embedding = embedding[:768]
-                else:
-                    embedding = embedding + [0.0] * (768 - len(embedding))
-                
-            return embedding
+            result = genai.embed_content(
+                model=self.model_name,
+                content=text,
+                task_type="retrieval_document",
+                title="Research Paper Chunk"
+            )
+            return result['embedding']
         except Exception as e:
             logger.error(f"Google Embedding Error (model {self.model_name}): {e}")
             # Final desperate fallback attempt
@@ -122,99 +102,15 @@ class EmbeddingService:
             except Exception:
                 return []
 
-    def _chunk_text(self, text: str, max_tokens: int = 800, overlap: int = 150) -> List[str]:
+    def store_embeddings(self, paper_instance: Any, sections: Dict[str, str], chunk_size: int = 1500) -> None:
         """
-        Robust Token-based splitting with Overlap.
+        Splits paper into chunks and stores their Google embeddings in PostgreSQL.
+        Uses batching to stay fast and avoid rate limits.
         
-        Logic:
-        1. Try to split by Paragraphs (\n\n).
-        2. If a chunk is still too big, try to split by Sentences (. ).
-        3. If still too big, use a sliding window of tokens with overlap.
-        
-        This preserves semantic meaning better than hard character cuts.
-        """
-        try:
-            encoding = tiktoken.get_encoding("cl100k_base")
-        except Exception:
-            # Fallback to a simpler encoding if something goes wrong
-            encoding = tiktoken.get_encoding("gpt2")
-            
-        def count_tokens(t: str) -> int:
-            return len(encoding.encode(t))
-
-        if count_tokens(text) <= max_tokens:
-            return [text.strip()]
-
-        chunks = []
-        # Step 1: Split into paragraphs
-        paragraphs = text.split('\n\n')
-        current_chunk = []
-        current_tokens = 0
-
-        for para in paragraphs:
-            para_tokens = count_tokens(para)
-            
-            # If a single paragraph is larger than max_tokens, we must split it further
-            if para_tokens > max_tokens:
-                # First, save what we have
-                if current_chunk:
-                    chunks.append("\n\n".join(current_chunk))
-                    current_chunk = []
-                    current_tokens = 0
-                
-                # Split paragraph by sentences
-                sentences = para.replace('. ', '.[SPLIT]').split('[SPLIT]')
-                for sent in sentences:
-                    sent_tokens = count_tokens(sent)
-                    if sent_tokens > max_tokens:
-                        # Hard token split with overlap (Last resort)
-                        tokens = encoding.encode(sent)
-                        for i in range(0, len(tokens), max_tokens - overlap):
-                            part_tokens = tokens[i:i + max_tokens]
-                            chunks.append(encoding.decode(part_tokens))
-                    else:
-                        if current_tokens + sent_tokens > max_tokens:
-                            chunks.append("\n\n".join(current_chunk))
-                            current_chunk = [sent]
-                            current_tokens = sent_tokens
-                        else:
-                            current_chunk.append(sent)
-                            current_tokens += sent_tokens
-            else:
-                # Standard paragraph accumulation
-                if current_tokens + para_tokens > max_tokens:
-                    chunks.append("\n\n".join(current_chunk))
-                    # Basic overlap: Include the last part of previous chunk if possible
-                    # For simplicity in this manual implementation, we just start fresh
-                    # But the 'sliding window' fallback above handles the true overlap.
-                    current_chunk = [para]
-                    current_tokens = para_tokens
-                else:
-                    current_chunk.append(para)
-                    current_tokens += para_tokens
-
-        if current_chunk:
-            chunks.append("\n\n".join(current_chunk))
-
-        # Add explicit sliding window overlap to all chunks to ensure context continuity
-        # This is what's missing in simple splitters
-        refined_chunks = []
-        for i, content in enumerate(chunks):
-            if i == 0:
-                refined_chunks.append(content)
-                continue
-            
-            # Add a bit of the previous chunk to the start of this one
-            prev_content = chunks[i-1]
-            prev_tokens = encoding.encode(prev_content)
-            overlap_text = encoding.decode(prev_tokens[-overlap:])
-            refined_chunks.append(f"...{overlap_text}\n{content}")
-            
-        return refined_chunks
-
-    def store_embeddings(self, paper_instance: Any, sections: Dict[str, str]) -> None:
-        """
-        Splits paper into chunks using token-based semantic splitting and stores them.
+        Args:
+            paper_instance: The Paper model instance.
+            sections: Dictionary of section names and their content.
+            chunk_size: Maximum character length for each text chunk.
         """
         # Ensure we have a working model first
         self._ensure_model()
@@ -226,12 +122,19 @@ class EmbeddingService:
         for section_name, text in sections.items():
             if not text.strip(): continue
             
-            # Use our new robust token-based chunker
-            section_chunks = self._chunk_text(text, max_tokens=800, overlap=150)
-            
-            for content in section_chunks:
-                if len(content.strip()) < 20: continue
-                all_chunks.append({"section": section_name, "text": content})
+            # Simple paragraph-based splitting
+            paragraphs = text.split('\n\n')
+            for para in paragraphs:
+                para = para.strip()
+                if not para or len(para) < 20: continue
+                
+                # Split huge paragraphs
+                if len(para) > chunk_size:
+                    sub_chunks = [para[i:i+chunk_size] for i in range(0, len(para), chunk_size)]
+                    for sc in sub_chunks:
+                        all_chunks.append({"section": section_name, "text": sc})
+                else:
+                    all_chunks.append({"section": section_name, "text": para})
 
         if not all_chunks:
             return
@@ -248,25 +151,13 @@ class EmbeddingService:
             
             try:
                 # Use batch_embed_contents for massive speedup
-                kwargs = {
-                    "model": self.model_name,
-                    "content": batch_texts,
-                    "task_type": "retrieval_document"
-                }
-                
-                # No output_dimensionality needed for gemini-embedding-001
-
-                result = genai.embed_content(**kwargs)
+                result = genai.embed_content(
+                    model=self.model_name,
+                    content=batch_texts,
+                    task_type="retrieval_document"
+                )
                 
                 for idx, vec in enumerate(result['embedding']):
-                    # Robust handling of dimension mismatch
-                    if len(vec) != 768:
-                        logger.warning(f"Batch dimension mismatch: {len(vec)}. Truncating/Padding to 768.")
-                        if len(vec) > 768:
-                            vec = vec[:768]
-                        else:
-                            vec = vec + [0.0] * (768 - len(vec))
-                        
                     embeddings_to_create.append(
                         EmbeddingModel(
                             paper=paper_instance,
@@ -314,11 +205,8 @@ class EmbeddingService:
                 model=self.model_name,
                 content=query,
                 task_type="retrieval_query"
-                # No output_dimensionality - native 768
             )
             query_vec = result['embedding']
-            if len(query_vec) != 768:
-                query_vec = query_vec[:768] if len(query_vec) > 768 else query_vec + [0.0] * (768 - len(query_vec))
         except Exception as e:
             logger.error(f"Google Search Embedding Error: {e}")
             return []

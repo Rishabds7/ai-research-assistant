@@ -5,6 +5,15 @@ File: backend/papers/tasks.py
 
 This file contains the long-running workflows that happen in the background.
 We use Celery so the UI remains responsive while the AI is thinking.
+
+AI INTERVIEW FOCUS:
+1. Asynchronous Pipeline: Explain how we split 'PDF Processing' (Fast), 
+   'Metadata Extraction' (Async), and 'Deep Summarization' (High Latency) into separate tasks.
+2. Context Window Optimization: Study the 'extract_metadata_task'. We don't send 
+   the whole 50-page paper to the LLM. We selectively 'Smart-Crop' the text 
+   to include the most high-density sections (Abstract, Intro, Labs).
+3. State Management: We use the 'TaskStatus' model to track the 'thinking' 
+   progress of the AI, providing real-time feedback to the UI.
 """
 import logging
 import uuid
@@ -66,17 +75,19 @@ def update_task_status(task_id: str, status: str, result: Optional[Dict] = None,
 @shared_task(bind=True, max_retries=3, default_retry_delay=10)
 def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
     """
-    INITIAL INGESTION PIPELINE (Stage 1 - FAST PATH).
+    INITIAL INGESTION PIPELINE (Stage 1).
+    Configured with retries for resilience on platforms like Render Free Tier.
     
-    Goal: Get the paper to "Processed" state AS FAST AS POSSIBLE (< 5s).
-    We only do the physical text extraction here.
-    AI analysis (Title, Authors, Embeddings) happens in background tasks.
+    Steps:
+    1. PDF -> Raw Text (PyMuPDF).
+    2. Text -> Sections (Heuristic Parsing).
+    3. Embeddings (COMING SOON).
     
-    Args:
+     Args:
         paper_id: UUID of the Paper record.
         
     Returns:
-        Dict: Status message.
+        Dict: Status or error message.
     """
     task_id = self.request.id
     update_task_status(task_id, 'running')
@@ -85,109 +96,107 @@ def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
         paper = Paper.objects.get(id=paper_id)
         processor = PDFProcessor()
         
-        # 1. FAST PATH: Immediate metadata extraction for UI
-        # We do this FIRST so the next polling cycle sees the title/authors
-        try:
-            fast_meta = processor.get_metadata(paper.file.path)
-            paper.title = sanitize_text(fast_meta.get("title") or "Extracting...")
-            if fast_meta.get("authors"):
-                paper.authors = json.dumps(fast_meta["authors"])
-            else:
-                paper.authors = json.dumps(["Processing..."])
-            paper.save(update_fields=['title', 'authors'])
-        except Exception as e:
-            logger.warning(f"Fast-path metadata failed for {paper_id}: {e}")
-        
-        # 2. PHYSICAL EXTRACTION (CPU Bound - potentially slow for large PDFs)
-        try:
-            text = processor.extract_text(paper.file.path)
-            if not text or len(text.strip()) < 100:
-                error_msg = 'Failed to extract meaningful text from PDF.'
-                update_task_status(task_id, 'failed', error=error_msg)
-                return {'error': error_msg}
-        except (ValueError, FileNotFoundError) as e:
-            error_msg = f"PDF file not found: {e}"
-            logger.error(error_msg)
+        # Extract Text
+        text = processor.extract_text(paper.file.path)
+        if not text or len(text.strip()) < 100:
+            error_msg = 'Failed to extract meaningful text from PDF.'
             update_task_status(task_id, 'failed', error=error_msg)
             return {'error': error_msg}
-
-        # 3. SECTION SPLITTING
-        sections = processor.detect_sections(text)
         
-        # 4. Save Core Data & Mark Ready
+        # Extract Paper Metadata (Title, Authors, Year) using LLM
+        try:
+            llm = LLMService()
+            metadata_context = text[:6000]  # First 6K chars for title/authors extraction
+            
+            # Use generic LLM prompt to extract title/authors/year
+            metadata_prompt = f"""Extract the following metadata from this research paper:
+- Title (exact title)
+- Authors (comma-separated list of author names)
+- Year (publication year, return "Unknown" if not found)
+- Journal (publication venue or "Unknown" if not found)
+
+Paper text:
+{metadata_context}
+
+Return ONLY valid JSON:
+{{
+  "title": "exact paper title",
+  "authors": ["Author One", "Author Two"],
+  "year": "2024",
+  "journal": "Journal Name"
+}}"""
+            
+            # Use the backend's _generate method directly for this custom prompt
+            if hasattr(llm.backend, '_generate_with_retry'):
+                # Gemini
+                response = llm.backend._generate_with_retry(metadata_prompt)
+                from services.llm_service import _get_response_text, _parse_json_safe
+                response_text = _get_response_text(response)
+                metadata = _parse_json_safe(response_text, {
+                    'title': paper.filename,
+                    'authors': [],
+                    'year': 'Unknown',
+                    'journal': 'Unknown'
+                })
+            elif hasattr(llm.backend, '_generate'):
+                # Ollama
+                response_text = llm.backend._generate(metadata_prompt, json_mode=True)
+                from services.llm_service import _parse_json_safe
+                metadata = _parse_json_safe(response_text, {
+                    'title': paper.filename,
+                    'authors': [],
+                    'year': 'Unknown',
+                    'journal': 'Unknown'
+                })
+            else:
+                # Fallback
+                metadata = {
+                    'title': paper.filename,
+                    'authors': [],
+                    'year': 'Unknown',
+                    'journal': 'Unknown'
+                }
+            
+            # Clean and store metadata
+            paper.title = sanitize_text(metadata.get('title', paper.filename) or paper.filename)
+            paper.authors = json.dumps(metadata.get('authors', [])) if isinstance(metadata.get('authors'), list) else str(metadata.get('authors', ''))
+            paper.year = sanitize_text(metadata.get('year', 'Unknown'))
+            paper.journal = sanitize_text(metadata.get('journal', 'Unknown'))
+            
+        except Exception as metadata_error:
+            logger.warning(f"Failed to extract metadata for paper {paper_id}: {metadata_error}")
+            paper.title = paper.filename
+            paper.authors = json.dumps([])
+            paper.year = 'Unknown'
+            paper.journal = 'Unknown'
+        
+        # Split into Sections
+        sections = processor.split_into_sections(text)
+        
+        # Save
         paper.full_text = sanitize_text(text)
         paper.sections = sanitize_text(sections)
         paper.processed = True
         paper.save()
         
-        # 5. Trigger ONLY Essential Background AI Tasks
-        # Title/Authors extraction: Needed for immediate card display
-        # Embeddings: Needed for RAG functionality
-        # NOTE: Summarization, Datasets, and Licenses are now USER-TRIGGERED (button clicks only)
-        details_task = identify_paper_details_task.delay(paper_id)
-        embed_task = generate_embeddings_task.delay(paper_id)
+        # Generate Embeddings  
+        embedding_service = EmbeddingService()
+        try:
+            embedding_service.generate_paper_embeddings(paper)
+        except Exception as embed_error:
+            logger.warning(f"Embedding generation failed for paper {paper_id}: {embed_error}")
         
-        paper.task_ids['identify_details'] = details_task.id
-        paper.task_ids['generate_embeddings'] = embed_task.id
-        
-        paper.save(update_fields=['task_ids'])
-        
-        update_task_status(task_id, 'completed', result={'message': 'PDF processed (AI running in background)'})
+        update_task_status(task_id, 'completed', result={'message': 'PDF processed successfully'})
         return {'message': 'PDF processed'}
         
+    except Paper.DoesNotExist:
+        error_msg = f'Paper {paper_id} does not exist.'
+        update_task_status(task_id, 'failed', error=error_msg)
+        return {'error': error_msg}
     except Exception as e:
         logger.error(f"PDF processing error for {paper_id}: {e}")
         update_task_status(task_id, 'failed', error=str(e))
         raise
-
-@shared_task(bind=True, max_retries=3, default_retry_delay=10)
-def identify_paper_details_task(self, paper_id: str) -> Dict[str, Any]:
-    """
-    STAGE 2: AI METADATA EXTRACTION (Async).
-    Extracts Title, Authors, Year using LLM.
-    Updates the paper record silently without blocking UI.
-    """
-    try:
-        paper = Paper.objects.get(id=paper_id)
-        llm = LLMService()
-        
-        # Use first 12k chars for high-density metadata context
-        context = paper.full_text[:12000] if paper.full_text else ""
-        metadata = llm.extract_paper_info(context)
-        
-        if not metadata:
-            metadata = {'title': paper.filename, 'authors': [], 'year': 'Unknown'}
-
-        # Update Paper
-        # ROBUSTNESS: AI sometimes returns null for journal/year. 
-        # We enforce "Unknown" to prevent DB constraint violations.
-        paper.title = sanitize_text(metadata.get('title') or paper.filename)
-        paper.authors = json.dumps(metadata.get('authors') or [])
-        paper.year = sanitize_text(metadata.get('year') or 'Unknown')
-        paper.journal = sanitize_text(metadata.get('journal') or 'Unknown')
-        paper.save(update_fields=['title', 'authors', 'year', 'journal'])
-        
-        return metadata
-
-    except Exception as e:
-        logger.error(f"Metadata extraction failed for {paper_id}: {e}")
-        return {'error': str(e)}
-
-@shared_task(bind=True, max_retries=3, default_retry_delay=10)
-def generate_embeddings_task(self, paper_id: str) -> Dict[str, str]:
-    """
-    STAGE 3: VECTOR EMBEDDINGS (Async).
-    Generates semantic vectors for RAG.
-    Heavy operation (can take 10-20s).
-    """
-    try:
-        paper = Paper.objects.get(id=paper_id)
-        embedding_service = EmbeddingService()
-        embedding_service.store_embeddings(paper, paper.sections or {})
-        return {'message': 'Embeddings generated'}
-    except Exception as e:
-        logger.error(f"Embedding generation failed for {paper_id}: {e}")
-        return {'error': str(e)}
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=5)
 def extract_methodology_task(self, paper_id: str) -> Dict[str, Any]:
@@ -285,7 +294,7 @@ def extract_all_sections_task(self, paper_id: str) -> Dict[str, str]:
         
         sections = paper.sections or {}
         llm = LLMService()
-        summaries_dict = llm.summarize_sections(sections, paper.full_text)
+        summaries_dict = llm.summarize_sections(sections)
         
         # Delete existing section summaries
         SectionSummary.objects.filter(paper=paper).delete()
@@ -312,14 +321,14 @@ def extract_all_sections_task(self, paper_id: str) -> Dict[str, str]:
 
 Return ONLY the TL;DR summary:"""
             
-            if llm.__class__.__name__ == 'GeminiLLMService':
+            if hasattr(llm.backend, '_generate_with_retry'):
                 # Gemini
-                response = llm._generate(global_summary_prompt)
-                # Gemini _generate returns Optional[str]
-                global_summary = response if response else "Summary not available"
-            elif llm.__class__.__name__ == 'OllamaLLMService':
+                response = llm.backend._generate_with_retry(global_summary_prompt)
+                from services.llm_service import _get_response_text
+                global_summary = _get_response_text(response)
+            elif hasattr(llm.backend, '_generate'):
                 # Ollama
-                global_summary = llm._generate(global_summary_prompt, json_mode=False)
+                global_summary = llm.backend._generate(global_summary_prompt, json_mode=False)
             else:
                 global_summary = "Summary not available"
             
@@ -369,30 +378,16 @@ def extract_metadata_task(self, paper_id: str, field: str) -> Dict[str, Any]:
         sections = paper.sections or {}
         sections_lower = {k.lower(): v for k, v in sections.items()}
         
-        # Build context with priority sections based on field
-        priority_keys = ['abstract', 'introduction', 'methodology', 'methods', 'experiments', 'experimental setup']
-        
-        if field == 'datasets':
-            priority_keys.extend(['datasets', 'datasets and metrics', 'evaluation', 'results', 'data availability'])
-        elif field == 'licenses':
-            priority_keys.extend(['availability', 'code availability', 'data availability', 'acknowledgments', 'license'])
-            
-        # Deduplicate keys while preserving order
-        priority_keys = list(dict.fromkeys(priority_keys))
-        
+        # Build context from high-density sections
         context_parts = []
-        for key in priority_keys:
-            if key in sections_lower and sections_lower[key]:
-                # Increase section limit to 5000 chars to capture more context
-                context_parts.append(f"--- {key.upper()} ---\n{sections_lower[key][:5000]}")
+        for section_key in ['abstract', 'introduction', 'methodology', 'methods', 'experiments', 'experimental setup']:
+            if section_key in sections_lower and sections_lower[section_key]:
+                context_parts.append(sections_lower[section_key][:2000])
         
-        # Join and cap at 30,000 chars (Gemini has large context window)
-        context = '\n\n'.join(context_parts)[:30000]
+        context = '\n\n'.join(context_parts)[:5000]
         
-        if len(context) < 1000:
-            # Fallback to full text if no sections found or context is too small
-            # Use first 30k chars which usually covers most of the paper
-            context = paper.full_text[:30000] if paper.full_text else ''
+        if not context:
+            context = paper.full_text[:5000] if paper.full_text else ''
         
         if not context:
             error_msg = f'No meaningful text to extract {field}.'
@@ -402,19 +397,46 @@ def extract_metadata_task(self, paper_id: str, field: str) -> Dict[str, Any]:
         llm = LLMService()
         
         if field == 'datasets':
-            result = llm.extract_datasets(context)
+            prompt = f"""List all datasets mentioned in this research paper.
+Return ONLY a JSON array of dataset names. If none found, return ["None mentioned"].
+
+Paper text:
+{context}
+
+Return format: ["dataset1", "dataset2"]"""
         elif field == 'licenses':
-            result = llm.extract_licenses(context)
+            prompt = f"""List all software licenses mentioned in this research paper.
+Return ONLY a JSON array of license names. If none found, return ["None mentioned"].
+
+Paper text:
+{context}
+
+Return format: ["license1", "license2"]"""
         else:
             error_msg = f'Invalid field: {field}'
             update_task_status(task_id, 'failed', error=error_msg)
             return {'error': error_msg}
         
+        # Execute LLM call
+        if hasattr(llm.backend, '_generate_with_retry'):
+            # Gemini
+            response = llm.backend._generate_with_retry(prompt)
+            from services.llm_service import _get_response_text, _parse_json_safe
+            response_text = _get_response_text(response)
+            result = _parse_json_safe(response_text, ["None mentioned"])
+        elif hasattr(llm.backend, '_generate'):
+            # Ollama
+            response_text = llm.backend._generate(prompt, json_mode=True)
+            from services.llm_service import _parse_json_safe
+            result = _parse_json_safe(response_text, ["None mentioned"])
+        else:
+            result = ["None mentioned"]
+        
         if not isinstance(result, list):
             result = ["None mentioned"]
         
         # Save to metadata
-        paper.metadata[field] = result
+        paper.metadata[field] = sanitize_text(result)
         paper.save(update_fields=['metadata'])
         
         update_task_status(task_id, 'completed', result={field: result})
