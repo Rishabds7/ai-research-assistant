@@ -91,6 +91,8 @@ temp/
 !PROJECT_SUMMARY.md
 !DEMO_CHEATSHEET.md
 !DEPLOY_RENDER.md
+!INTERVIEW_PREP_LOCAL_SETUP.md
 project_design_documents/
 code_walkthrough/
 !interview_prep/
+!interview_prep/*.md
