@@ -5,17 +5,6 @@ File: backend/services/llm_service.py
 
 This is the Brain of the application. It maps high-level research questions 
 (e.g., 'Summarize this') to specific LLM prompts.
-
-AI INTERVIEW FOCUS:
-1. Factory Pattern: We use a custom 'LLMService' class that acts as a factory. 
-   It dynamically instantiates either GeminiLLMService (Google Cloud) or 
-   OllamaLLMService (Local Llama 3) based on environment settings.
-2. Prompt Engineering: Study the 'extract_methodology' and 'smart_summarize_paper' 
-   prompts. We use 'Few-Shot' prompting and 'Chain-of-Thought' style instructions 
-   to ensure the LLM returns valid JSON.
-3. Post-Processing: We don't trust the raw LLM output. The 'clean_llm_summary' 
-   function uses Regex to strip out 'AI chatter' and meta-talk, ensuring a 
-   professional UI.
 """
 
 import json

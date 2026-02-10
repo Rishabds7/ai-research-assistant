@@ -5,15 +5,6 @@ File: backend/papers/tasks.py
 
 This file contains the long-running workflows that happen in the background.
 We use Celery so the UI remains responsive while the AI is thinking.
-
-AI INTERVIEW FOCUS:
-1. Asynchronous Pipeline: Explain how we split 'PDF Processing' (Fast), 
-   'Metadata Extraction' (Async), and 'Deep Summarization' (High Latency) into separate tasks.
-2. Context Window Optimization: Study the 'extract_metadata_task'. We don't send 
-   the whole 50-page paper to the LLM. We selectively 'Smart-Crop' the text 
-   to include the most high-density sections (Abstract, Intro, Labs).
-3. State Management: We use the 'TaskStatus' model to track the 'thinking' 
-   progress of the AI, providing real-time feedback to the UI.
 """
 import logging
 import uuid
