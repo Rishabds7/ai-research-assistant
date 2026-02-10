@@ -171,7 +171,7 @@ Return ONLY valid JSON:
             paper.journal = 'Unknown'
         
         # Split into Sections
-        sections = processor.split_into_sections(text)
+        sections = processor.detect_sections(text)
         
         # Save
         paper.full_text = sanitize_text(text)
