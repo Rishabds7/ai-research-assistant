@@ -413,15 +413,6 @@ class GeminiLLMService:
                 is_429 = "429" in error_str or "Resource exhausted" in error_str
                 is_404 = "404" in error_str or "not found" in error_str.lower()
 
-                if is_404:
-                     logger.error(f"Gemini Model {self.model._model_name} not found (404). Switching to fallback: gemini-1.5-flash")
-                     self.model = genai.GenerativeModel(
-                        model_name="gemini-1.5-flash",
-                        generation_config={"temperature": 0.1}
-                     )
-                     # Retry immediately with new model
-                     continue # will retry with new self.model
-                
                 if is_429:
                     if attempt < max_retries:
                         # Exponential backoff capped at 60s (Gemini quota resets every 60s)
