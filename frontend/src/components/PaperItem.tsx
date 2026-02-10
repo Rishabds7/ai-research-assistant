@@ -315,6 +315,19 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         return paper.authors;
     };
 
+    const renderTitle = () => {
+        if (!paper.title || paper.title === "Unknown" || paper.title === "Extracting...") {
+            return (
+                <span className="flex items-center gap-2 text-slate-400 italic font-medium">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Extracting title...
+                </span>
+            );
+        }
+
+        return paper.title;
+    };
+
 
     return (
         <Card ref={cardRef} className="bg-white shadow-xl rounded-2xl overflow-hidden border-2 border-[#F1E9D2] transition-all duration-500 hover:shadow-2xl hover:border-[#D4AF37]/30">
@@ -616,8 +629,8 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     <div className="grid grid-cols-1 gap-6 bg-[#FCF9F1]/40 p-6 rounded-2xl border border-[#F1E9D2]/50 shadow-inner-sm">
                         <div className="space-y-2">
                             <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">Formal Title</h4>
-                            <div className={`text-base font-extrabold leading-tight ${(!paper.title || paper.title === "Unknown" || paper.title === paper.filename) ? "text-[#1A365D]/70" : "text-[#1A365D]"}`}>
-                                {paper.title || paper.filename}
+                            <div className="text-base font-extrabold leading-tight text-[#1A365D]">
+                                {renderTitle()}
                             </div>
                         </div>
                         <div className="space-y-2 pt-4 border-t border-[#F1E9D2]/30">

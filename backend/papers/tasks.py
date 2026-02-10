@@ -98,7 +98,7 @@ def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
         # We do this FIRST so the next polling cycle sees the title/authors
         try:
             fast_meta = processor.get_metadata(paper.file.path)
-            paper.title = sanitize_text(fast_meta.get("title") or paper.filename)
+            paper.title = sanitize_text(fast_meta.get("title") or "Extracting...")
             if fast_meta.get("authors"):
                 paper.authors = json.dumps(fast_meta["authors"])
             else:
