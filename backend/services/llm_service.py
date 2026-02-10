@@ -794,10 +794,13 @@ Return ONLY the JSON object.
             if mapped_content:
                 mapped_sections[standard_section] = '\n\n'.join(mapped_content)
         
-        # SMART FALLBACKS: Ensure no section is left entirely empty if full_text is available
-        if full_text:
-            if not mapped_sections.get('Abstract') or len(mapped_sections['Abstract']) < 100:
-                mapped_sections['Abstract'] = full_text[:8000]
+        # REVERT TO SEQUENTIAL: Batching with Pro model was causing timeouts and incomplete JSON on Render.
+        # We will use the Pro model's intelligence but process section-by-section for reliability.
+        if "pro" in GEMINI_MODEL.lower() or "1.5" in GEMINI_MODEL:
+             logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL} (Batching Disabled for Reliability)")
+             # Fall through to the sequential loop below
+        else:
+             logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL}")
 
             if not mapped_sections.get('Introduction') or len(mapped_sections['Introduction']) < 100:
                 mapped_sections['Introduction'] = full_text[2000:15000]
