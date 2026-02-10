@@ -13,6 +13,7 @@ BENEFITS:
 """
 
 import logging
+import tiktoken
 from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
@@ -132,15 +133,99 @@ class EmbeddingService:
             except Exception:
                 return []
 
-    def store_embeddings(self, paper_instance: Any, sections: Dict[str, str], chunk_size: int = 1500) -> None:
+    def _chunk_text(self, text: str, max_tokens: int = 800, overlap: int = 150) -> List[str]:
         """
-        Splits paper into chunks and stores their Google embeddings in PostgreSQL.
-        Uses batching to stay fast and avoid rate limits.
+        Robust Token-based splitting with Overlap.
         
-        Args:
-            paper_instance: The Paper model instance.
-            sections: Dictionary of section names and their content.
-            chunk_size: Maximum character length for each text chunk.
+        Logic:
+        1. Try to split by Paragraphs (\n\n).
+        2. If a chunk is still too big, try to split by Sentences (. ).
+        3. If still too big, use a sliding window of tokens with overlap.
+        
+        This preserves semantic meaning better than hard character cuts.
+        """
+        try:
+            encoding = tiktoken.get_encoding("cl100k_base")
+        except Exception:
+            # Fallback to a simpler encoding if something goes wrong
+            encoding = tiktoken.get_encoding("gpt2")
+            
+        def count_tokens(t: str) -> int:
+            return len(encoding.encode(t))
+
+        if count_tokens(text) <= max_tokens:
+            return [text.strip()]
+
+        chunks = []
+        # Step 1: Split into paragraphs
+        paragraphs = text.split('\n\n')
+        current_chunk = []
+        current_tokens = 0
+
+        for para in paragraphs:
+            para_tokens = count_tokens(para)
+            
+            # If a single paragraph is larger than max_tokens, we must split it further
+            if para_tokens > max_tokens:
+                # First, save what we have
+                if current_chunk:
+                    chunks.append("\n\n".join(current_chunk))
+                    current_chunk = []
+                    current_tokens = 0
+                
+                # Split paragraph by sentences
+                sentences = para.replace('. ', '.[SPLIT]').split('[SPLIT]')
+                for sent in sentences:
+                    sent_tokens = count_tokens(sent)
+                    if sent_tokens > max_tokens:
+                        # Hard token split with overlap (Last resort)
+                        tokens = encoding.encode(sent)
+                        for i in range(0, len(tokens), max_tokens - overlap):
+                            part_tokens = tokens[i:i + max_tokens]
+                            chunks.append(encoding.decode(part_tokens))
+                    else:
+                        if current_tokens + sent_tokens > max_tokens:
+                            chunks.append("\n\n".join(current_chunk))
+                            current_chunk = [sent]
+                            current_tokens = sent_tokens
+                        else:
+                            current_chunk.append(sent)
+                            current_tokens += sent_tokens
+            else:
+                # Standard paragraph accumulation
+                if current_tokens + para_tokens > max_tokens:
+                    chunks.append("\n\n".join(current_chunk))
+                    # Basic overlap: Include the last part of previous chunk if possible
+                    # For simplicity in this manual implementation, we just start fresh
+                    # But the 'sliding window' fallback above handles the true overlap.
+                    current_chunk = [para]
+                    current_tokens = para_tokens
+                else:
+                    current_chunk.append(para)
+                    current_tokens += para_tokens
+
+        if current_chunk:
+            chunks.append("\n\n".join(current_chunk))
+
+        # Add explicit sliding window overlap to all chunks to ensure context continuity
+        # This is what's missing in simple splitters
+        refined_chunks = []
+        for i, content in enumerate(chunks):
+            if i == 0:
+                refined_chunks.append(content)
+                continue
+            
+            # Add a bit of the previous chunk to the start of this one
+            prev_content = chunks[i-1]
+            prev_tokens = encoding.encode(prev_content)
+            overlap_text = encoding.decode(prev_tokens[-overlap:])
+            refined_chunks.append(f"...{overlap_text}\n{content}")
+            
+        return refined_chunks
+
+    def store_embeddings(self, paper_instance: Any, sections: Dict[str, str]) -> None:
+        """
+        Splits paper into chunks using token-based semantic splitting and stores them.
         """
         # Ensure we have a working model first
         self._ensure_model()
@@ -152,19 +237,12 @@ class EmbeddingService:
         for section_name, text in sections.items():
             if not text.strip(): continue
             
-            # Simple paragraph-based splitting
-            paragraphs = text.split('\n\n')
-            for para in paragraphs:
-                para = para.strip()
-                if not para or len(para) < 20: continue
-                
-                # Split huge paragraphs
-                if len(para) > chunk_size:
-                    sub_chunks = [para[i:i+chunk_size] for i in range(0, len(para), chunk_size)]
-                    for sc in sub_chunks:
-                        all_chunks.append({"section": section_name, "text": sc})
-                else:
-                    all_chunks.append({"section": section_name, "text": para})
+            # Use our new robust token-based chunker
+            section_chunks = self._chunk_text(text, max_tokens=800, overlap=150)
+            
+            for content in section_chunks:
+                if len(content.strip()) < 20: continue
+                all_chunks.append({"section": section_name, "text": content})
 
         if not all_chunks:
             return

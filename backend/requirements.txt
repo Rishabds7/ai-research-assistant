@@ -21,6 +21,7 @@ pypdf==6.7.0
 
 # LLM Integration
 google-generativeai==0.7.2
+tiktoken==0.6.0
 requests==2.31.0
 
 # Excel Export
