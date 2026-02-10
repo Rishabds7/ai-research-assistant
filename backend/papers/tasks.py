@@ -127,11 +127,12 @@ Return ONLY valid JSON:
 }}"""
             
             # Use the _generate method directly for this custom prompt
-            if hasattr(llm, '_generate_with_retry'):
+            if llm.__class__.__name__ == 'GeminiLLMService':
                 # Gemini
-                response = llm._generate_with_retry(metadata_prompt)
+                response = llm._generate(metadata_prompt)
                 from services.llm_service import _get_response_text, _parse_json_safe
-                response_text = _get_response_text(response)
+                # Gemini _generate returns Optional[str], so we handle it directly
+                response_text = response if response else ""
                 metadata = _parse_json_safe(response_text, {
                     'title': paper.filename,
                     'authors': [],
@@ -182,7 +183,7 @@ Return ONLY valid JSON:
         # Generate Embeddings  
         embedding_service = EmbeddingService()
         try:
-            embedding_service.generate_paper_embeddings(paper)
+            embedding_service.store_embeddings(paper, paper.sections or {})
         except Exception as embed_error:
             logger.warning(f"Embedding generation failed for paper {paper_id}: {embed_error}")
         
@@ -321,11 +322,11 @@ def extract_all_sections_task(self, paper_id: str) -> Dict[str, str]:
 
 Return ONLY the TL;DR summary:"""
             
-            if hasattr(llm, '_generate_with_retry'):
+            if llm.__class__.__name__ == 'GeminiLLMService':
                 # Gemini
-                response = llm._generate_with_retry(global_summary_prompt)
-                from services.llm_service import _get_response_text
-                global_summary = _get_response_text(response)
+                response = llm._generate(global_summary_prompt)
+                # Gemini _generate returns Optional[str]
+                global_summary = response if response else "Summary not available"
             elif llm.__class__.__name__ == 'OllamaLLMService':
                 # Ollama
                 global_summary = llm._generate(global_summary_prompt, json_mode=False)
@@ -418,11 +419,11 @@ Return format: ["license1", "license2"]"""
             return {'error': error_msg}
         
         # Execute LLM call
-        if hasattr(llm, '_generate_with_retry'):
+        if llm.__class__.__name__ == 'GeminiLLMService':
             # Gemini
-            response = llm._generate_with_retry(prompt)
-            from services.llm_service import _get_response_text, _parse_json_safe
-            response_text = _get_response_text(response)
+            response = llm._generate(prompt)
+            from services.llm_service import _parse_json_safe
+            response_text = response if response else ""
             result = _parse_json_safe(response_text, ["None mentioned"])
         elif llm.__class__.__name__ == 'OllamaLLMService':
             # Ollama
