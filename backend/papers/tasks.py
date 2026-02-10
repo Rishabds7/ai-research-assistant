@@ -130,7 +130,7 @@ Return ONLY valid JSON:
             if llm.__class__.__name__ == 'GeminiLLMService':
                 # Gemini
                 response = llm._generate(metadata_prompt)
-                from services.llm_service import _get_response_text, _parse_json_safe
+                from services.llm_service import _parse_json_safe
                 # Gemini _generate returns Optional[str], so we handle it directly
                 response_text = response if response else ""
                 metadata = _parse_json_safe(response_text, {
