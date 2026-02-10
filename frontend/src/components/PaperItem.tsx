@@ -598,11 +598,6 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                             <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">Formal Title</h4>
                             <div className={`text-base font-extrabold leading-tight ${(!paper.title || paper.title === "Unknown" || paper.title === paper.filename) ? "text-[#1A365D]/70" : "text-[#1A365D]"}`}>
                                 {paper.title || paper.filename}
-                                {paper.title === paper.filename && paper.processed && (
-                                    <span className="ml-2 inline-flex items-center gap-1.5 text-[9px] text-amber-600 font-bold uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 animate-pulse">
-                                        <Loader2 className="h-2 w-2 animate-spin" /> AI Verifying Title
-                                    </span>
-                                )}
                             </div>
                         </div>
                         <div className="space-y-2 pt-4 border-t border-[#F1E9D2]/30">
