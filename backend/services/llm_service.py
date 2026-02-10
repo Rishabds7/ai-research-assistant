@@ -486,7 +486,7 @@ Return ONLY a JSON object with this exact structure:
 
 Text:
 """ + context[:15000]
-        raw = self._generate(prompt)
+        raw = self._generate(prompt, use_flash=True)
         return _parse_json_safe(raw, {
             "title": "Unknown", 
             "authors": ["Unknown"], 
@@ -524,7 +524,7 @@ Rules:
 
 Snippets:
 """ + snippets_text
-        raw = self._generate(prompt)
+        raw = self._generate(prompt, use_flash=True)
         result = _parse_json_safe(raw, ["None mentioned"])
         return result if result else ["None mentioned"]
     
