@@ -114,7 +114,15 @@ def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
         paper.full_text = sanitize_text(text)
         paper.sections = sanitize_text(sections)
         paper.processed = True
-        paper.title = paper.filename # Temporary title until AI fixes it
+        
+        # Fast Metadata Extraction (Immediate feedback)
+        fast_meta = processor.get_metadata(paper.file.path)
+        paper.title = fast_meta.get("title") or paper.filename
+        if fast_meta.get("authors"):
+            paper.authors = json.dumps(fast_meta["authors"])
+        else:
+            paper.authors = json.dumps(["Processing..."])
+            
         paper.save()
         
         # 4. Trigger Async AI Tasks (Fire & Forget)

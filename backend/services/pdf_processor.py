@@ -115,6 +115,51 @@ class PDFProcessor:
         except Exception as e:
             raise ValueError(f"Error extracting text with pypdf: {e}") from e
 
+    def get_metadata(self, pdf_path: Union[Path, str]) -> Dict[str, Any]:
+        """
+        Extracts PDF metadata (Title, Author, etc.) directly from the file.
+        This is extremely fast and works for most professionally published papers.
+        """
+        path = Path(pdf_path)
+        metadata = {"title": "", "authors": ""}
+        
+        # Try PyMuPDF
+        try:
+            import fitz
+            doc = fitz.open(path)
+            meta = doc.metadata
+            if meta.get("title") and len(meta["title"].strip()) > 5:
+                metadata["title"] = meta["title"].strip()
+            if meta.get("author") and len(meta["author"].strip()) > 2:
+                # Often authors are a comma-separated string in metadata
+                authors = meta["author"].strip()
+                if "," in authors:
+                    metadata["authors"] = [a.strip() for a in authors.split(",")]
+                else:
+                    metadata["authors"] = [authors]
+            doc.close()
+            if metadata["title"]: return metadata
+        except Exception:
+            pass
+            
+        # Fallback to pypdf
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(path)
+            meta = reader.metadata
+            if meta and meta.title and len(meta.title.strip()) > 5:
+                metadata["title"] = meta.title.strip()
+            if meta and meta.author and len(meta.author.strip()) > 2:
+                authors = meta.author.strip()
+                if "," in authors:
+                    metadata["authors"] = [a.strip() for a in authors.split(",")]
+                else:
+                    metadata["authors"] = [authors]
+        except Exception:
+            pass
+            
+        return metadata
+
     def detect_sections(self, text: str) -> Dict[str, str]:
         """
         Segment the paper into logical parts (Abstract, Methodology, etc.) using a two-pass approach.

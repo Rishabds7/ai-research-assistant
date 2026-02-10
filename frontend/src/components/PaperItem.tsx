@@ -280,7 +280,15 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         if (!paper.authors || paper.authors === "Unknown") return "Not Available";
         try {
             const parsed = JSON.parse(paper.authors);
-            if (Array.isArray(parsed)) return parsed.join(", ");
+            if (Array.isArray(parsed)) {
+                if (parsed[0] === "Processing...") return (
+                    <span className="flex items-center gap-2 text-slate-400 italic font-medium">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Refining authors...
+                    </span>
+                );
+                return parsed.join(", ");
+            }
         } catch (e) {
             // Not JSON
         }
@@ -588,24 +596,19 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                     <div className="grid grid-cols-1 gap-6 bg-[#FCF9F1]/40 p-6 rounded-2xl border border-[#F1E9D2]/50 shadow-inner-sm">
                         <div className="space-y-2">
                             <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">Formal Title</h4>
-                            <div className={`text-base font-extrabold leading-tight ${(!paper.title || paper.title === "Unknown") ? "text-slate-400 italic" : "text-[#1A365D]"}`}>
-                                {!paper.processed ? (
-                                    <span className="flex items-center gap-2 text-slate-400 italic font-medium">
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                        Extracting...
+                            <div className={`text-base font-extrabold leading-tight ${(!paper.title || paper.title === "Unknown" || paper.title === paper.filename) ? "text-[#1A365D]/70" : "text-[#1A365D]"}`}>
+                                {paper.title || paper.filename}
+                                {paper.title === paper.filename && paper.processed && (
+                                    <span className="ml-2 inline-flex items-center gap-1.5 text-[9px] text-amber-600 font-bold uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 animate-pulse">
+                                        <Loader2 className="h-2 w-2 animate-spin" /> AI Verifying Title
                                     </span>
-                                ) : (paper.title || "Not Available")}
+                                )}
                             </div>
                         </div>
                         <div className="space-y-2 pt-4 border-t border-[#F1E9D2]/30">
                             <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">Authors</h4>
                             <div className={`text-[13px] leading-snug font-medium italic ${(!paper.authors || paper.authors === "Unknown") ? "text-slate-400 italic" : "text-slate-600"}`}>
-                                {!paper.processed ? (
-                                    <span className="flex items-center gap-2 text-slate-400 italic font-medium">
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                        Identifying...
-                                    </span>
-                                ) : renderAuthors()}
+                                {renderAuthors()}
                             </div>
                         </div>
                     </div>
