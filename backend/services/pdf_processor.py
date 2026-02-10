@@ -61,6 +61,9 @@ class PDFProcessor:
         "summary",
         "acknowledgments",
         "acknowledgements",
+        "data availability",
+        "code availability",
+        "availability",
         "references"
     ]
 

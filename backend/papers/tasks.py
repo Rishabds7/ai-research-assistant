@@ -379,16 +379,30 @@ def extract_metadata_task(self, paper_id: str, field: str) -> Dict[str, Any]:
         sections = paper.sections or {}
         sections_lower = {k.lower(): v for k, v in sections.items()}
         
-        # Build context from high-density sections
+        # Build context with priority sections based on field
+        priority_keys = ['abstract', 'introduction', 'methodology', 'methods', 'experiments', 'experimental setup']
+        
+        if field == 'datasets':
+            priority_keys.extend(['datasets', 'datasets and metrics', 'evaluation', 'results', 'data availability'])
+        elif field == 'licenses':
+            priority_keys.extend(['availability', 'code availability', 'data availability', 'acknowledgments', 'license'])
+            
+        # Deduplicate keys while preserving order
+        priority_keys = list(dict.fromkeys(priority_keys))
+        
         context_parts = []
-        for section_key in ['abstract', 'introduction', 'methodology', 'methods', 'experiments', 'experimental setup']:
-            if section_key in sections_lower and sections_lower[section_key]:
-                context_parts.append(sections_lower[section_key][:2000])
+        for key in priority_keys:
+            if key in sections_lower and sections_lower[key]:
+                # Increase section limit to 5000 chars to capture more context
+                context_parts.append(f"--- {key.upper()} ---\n{sections_lower[key][:5000]}")
         
-        context = '\n\n'.join(context_parts)[:5000]
+        # Join and cap at 30,000 chars (Gemini has large context window)
+        context = '\n\n'.join(context_parts)[:30000]
         
-        if not context:
-            context = paper.full_text[:5000] if paper.full_text else ''
+        if len(context) < 1000:
+            # Fallback to full text if no sections found or context is too small
+            # Use first 30k chars which usually covers most of the paper
+            context = paper.full_text[:30000] if paper.full_text else ''
         
         if not context:
             error_msg = f'No meaningful text to extract {field}.'
@@ -398,18 +412,20 @@ def extract_metadata_task(self, paper_id: str, field: str) -> Dict[str, Any]:
         llm = LLMService()
         
         if field == 'datasets':
-            prompt = f"""List all datasets mentioned in this research paper.
-Return ONLY a JSON array of dataset names. If none found, return ["None mentioned"].
+            prompt = f"""Analyze the following paper text and list ALL datasets, databases, or data benchmarks used or created.
+Be thorough. If a dataset is mentioned by name (e.g., "ImageNet", "CoNLL-2003"), include it.
+Return ONLY a JSON array of strings. If absolutely no datasets are mentioned, return ["None mentioned"].
 
-Paper text:
+Paper Text:
 {context}
 
 Return format: ["dataset1", "dataset2"]"""
         elif field == 'licenses':
-            prompt = f"""List all software licenses mentioned in this research paper.
-Return ONLY a JSON array of license names. If none found, return ["None mentioned"].
+            prompt = f"""Analyze the following paper text and list ALL software licenses or data usage terms mentioned.
+Look for "MIT", "Apache", "CC-BY", "GPL", or custom terms like "Research Use Only".
+Return ONLY a JSON array of strings. If absolutely no licenses are mentioned, return ["None mentioned"].
 
-Paper text:
+Paper Text:
 {context}
 
 Return format: ["license1", "license2"]"""
