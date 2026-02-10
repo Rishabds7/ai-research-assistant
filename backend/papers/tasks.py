@@ -156,39 +156,12 @@ def identify_paper_details_task(self, paper_id: str) -> Dict[str, Any]:
         paper = Paper.objects.get(id=paper_id)
         llm = LLMService()
         
-        # Use first 6k chars
-        context = paper.full_text[:6000] if paper.full_text else ""
+        # Use first 12k chars for high-density metadata context
+        context = paper.full_text[:12000] if paper.full_text else ""
+        metadata = llm.extract_paper_info(context)
         
-        metadata_prompt = f"""Extract the following metadata from this research paper:
-- Title (exact title)
-- Authors (comma-separated list of author names)
-- Year (publication year)
-- Journal (publication venue)
-
-Paper text:
-{context}
-
-Return ONLY valid JSON:
-{{
-  "title": "exact paper title",
-  "authors": ["Author One", "Author Two"],
-  "year": "2024",
-  "journal": "Journal Name"
-}}"""
-
-        # Call LLM
-        if llm.__class__.__name__ == 'GeminiLLMService':
-            response = llm._generate(metadata_prompt)
-            from services.llm_service import _parse_json_safe
-            metadata = _parse_json_safe(response if response else "", {
-                'title': paper.filename,
-                'authors': [],
-                'year': 'Unknown',
-                'journal': 'Unknown'
-            })
-        else:
-             # Fallback
-             metadata = {'title': paper.filename, 'authors': [], 'year': 'Unknown'}
+        if not metadata:
+            metadata = {'title': paper.filename, 'authors': [], 'year': 'Unknown'}
 
         # Update Paper
         # ROBUSTNESS: AI sometimes returns null for journal/year. 

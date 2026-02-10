@@ -88,6 +88,7 @@ export default function Home() {
         uploaded_at: new Date().toISOString(),
         file: '',
         title: 'Extracting...',
+        authors: JSON.stringify(["Processing..."]),
       } as Paper));
 
       setPapers(prev => [...placeholders, ...prev]);
@@ -128,6 +129,7 @@ export default function Home() {
       uploaded_at: new Date().toISOString(),
       file: '',
       title: 'Connecting to ArXiv...',
+      authors: JSON.stringify(["Processing..."]),
     } as Paper;
 
     setPapers(prev => [placeholder, ...prev]);
