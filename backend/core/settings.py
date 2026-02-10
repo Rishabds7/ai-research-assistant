@@ -181,6 +181,6 @@ GEMINI_API_KEY = env('GEMINI_API_KEY', default=env('GOOGLE_API_KEY', default='')
 # Ensure Google SDK can find the key under its preferred name in all contexts
 if GEMINI_API_KEY:
     os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
-GEMINI_MODEL = env('GEMINI_MODEL', default='gemini-2.0-flash')
+GEMINI_MODEL = env('GEMINI_MODEL', default='gemini-1.5-pro')
 OLLAMA_HOST = env('OLLAMA_HOST', default='http://localhost:11434')
 OLLAMA_MODEL = env('OLLAMA_MODEL', default='llama3')

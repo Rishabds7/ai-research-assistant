@@ -39,11 +39,11 @@ services:
       - DATABASE_URL=postgresql://postgres:postgrespassword@research_db:5432/research_assistant
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - LLM_PROVIDER=gemini
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL}
-      # - OLLAMA_HOST=http://host.docker.internal:11434
-      # - OLLAMA_MODEL=llama3
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend
     depends_on:
       - research_db
@@ -62,11 +62,11 @@ services:
       - DATABASE_URL=postgresql://postgres:postgrespassword@research_db:5432/research_assistant
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - LLM_PROVIDER=gemini
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL}
-      # - OLLAMA_HOST=http://host.docker.internal:11434
-      # - OLLAMA_MODEL=llama3
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
     depends_on:
       - research_db
       - redis

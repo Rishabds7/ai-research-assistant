@@ -684,6 +684,68 @@ Return ONLY the JSON list of strings."""
                 processed.append(line)
         return "\n".join(processed)
 
+    def _summarize_batch(self, mapped_sections: Dict[str, str]) -> Dict[str, str]:
+        """
+        Batch summarization optimized for Gemini 1.5 Pro (2M context).
+        Sends all sections in ONE request to save API calls and avoid 429s.
+        
+        Args:
+            mapped_sections: Dict of {SectionName: Content}
+            
+        Returns:
+            Dict: Map of {SectionName: Summary}
+        """
+        # Construct a structured prompt
+        paper_content = ""
+        for section, content in mapped_sections.items():
+            if content and len(content.strip()) > 50:
+                paper_content += f"\n--- SECTION: {section.upper()} ---\n{self._pre_clean_content(content)[:30000]}\n"
+        
+        prompt = f"""You are a senior research scientist. I will provide you with the full text of a research paper, split by sections.
+Your task is to generate a high-density technical summary for EACH section provided.
+
+**Conventions:**
+1. Return a JSON object where keys are the Section Names provided (e.g., "Abstract", "Introduction") and values are the summaries.
+2. Each summary MUST consist of 6-8 comprehensive bullet points.
+3. Each bullet point MUST start with a '-' symbol.
+4. Each bullet point MUST be a single, long-form continuous line (no newlines within a bullet).
+5. Do NOT include introductory text or meta-commentary inside the values.
+
+**Paper Content:**
+{paper_content}
+
+**Output Format:**
+{{
+    "Abstract": "- Bullet 1...\\n- Bullet 2...",
+    "Introduction": "- Bullet 1...\\n- Bullet 2...",
+    ...
+}}
+
+Return ONLY the JSON object.
+"""
+        raw = self._generate(prompt)
+        parsed = _parse_json_safe(raw)
+        
+        if not parsed or not isinstance(parsed, dict):
+            logger.warning("Batch summarization failed to parse JSON. Falling back to sequential loop.")
+            return {}
+            
+        # Post-process keys to match standard sections
+        final_summaries = {}
+        for k, v in parsed.items():
+            # Normalize key
+            norm_key = k.title()
+            if norm_key in mapped_sections:
+                final_summaries[norm_key] = clean_llm_summary(v)
+            else:
+                # Try to map loose keys back to standard ones
+                for std in mapped_sections.keys():
+                    if std.lower() in k.lower():
+                        final_summaries[std] = clean_llm_summary(v)
+                        break
+        
+        return final_summaries
+
     def summarize_sections(self, sections: Dict[str, str], full_text: str = "") -> Dict[str, str]:
         """
         Maps paper sections to standardized academic sections and creates summaries.
@@ -765,7 +827,20 @@ Return ONLY the JSON list of strings."""
                 mapped_sections['Conclusion'] = full_text[-12000:]
         
         # Generate summaries for each standard section
+        # Generate summaries for each standard section
         summaries = {}
+        
+        # STRATEGY SWITCH: Use Batching for Pro models (huge context), Sequential for Flash/Others
+        # 'gemini-1.5-pro' can handle the whole paper in one go.
+        if "pro" in GEMINI_MODEL.lower() or "1.5" in GEMINI_MODEL:
+            logger.info(f"Using BATCH summarization strategy for model: {GEMINI_MODEL}")
+            batch_results = self._summarize_batch(mapped_sections)
+            if batch_results:
+                return batch_results
+            # If batch fails, fall through to sequential loop
+        
+        logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL}")
+
         # Iterate through STANDARD_SECTIONS to maintain order and ensure we check all
         for section_name in STANDARD_SECTIONS:
             content = mapped_sections.get(section_name)
