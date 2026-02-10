@@ -384,9 +384,15 @@ class GeminiLLMService:
             model_name=GEMINI_MODEL,
             generation_config={"temperature": 0.1}
         )
-        logger.info(f"LLM: Initialized Gemini service with model {GEMINI_MODEL}")
+        # INITIALIZE FLASH MODEL for "Fast-Path" tasks (Metadata, Datasets, Licenses)
+        # Flash is ~3-4x faster and has much higher rate limits.
+        self.flash_model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            generation_config={"temperature": 0.1}
+        )
+        logger.info(f"LLM: Initialized Gemini service (Pro: {GEMINI_MODEL}, Flash: gemini-1.5-flash)")
 
-    def _generate(self, prompt: str) -> Optional[str]:
+    def _generate(self, prompt: str, **kwargs) -> Optional[str]:
         """
         Robust API call wrapper with AGGRESSIVE retries for rate limits.
         Designed to wait out the 60s quota window of Gemini Free Tier.
@@ -403,7 +409,9 @@ class GeminiLLMService:
 
         for attempt in range(max_retries + 1):
             try:
-                response = self.model.generate_content(prompt)
+                # Optional: use_flash override
+                active_model = getattr(self, 'flash_model', self.model) if kwargs.get('use_flash') else self.model
+                response = active_model.generate_content(prompt)
                 if response.candidates and response.candidates[0].content.parts:
                     return response.text
                 return "" # Return empty string if swift safety filter blocks it, but not None
@@ -457,16 +465,16 @@ class GeminiLLMService:
 4. Journal or Conference Name (if mentioned, otherwise "Unknown")
 
 Return ONLY a JSON object with this exact structure:
-{
+{{
     "title": "Full paper title",
     "authors": ["Author One", "Author Two"],
     "year": "2024",
     "journal": "Nature / ArXiv / etc."
-}
+}}
 
 Text:
-""" + context[:12000]
-        raw = self._generate(prompt)
+""" + context[:15000]
+        raw = self._generate(prompt, use_flash=True)
         return _parse_json_safe(raw, {
             "title": "Unknown", 
             "authors": ["Unknown"], 
@@ -504,7 +512,7 @@ Rules:
 
 Snippets:
 """ + snippets_text
-        raw = self._generate(prompt)
+        raw = self._generate(prompt, use_flash=True)
         result = _parse_json_safe(raw, ["None mentioned"])
         return result if result else ["None mentioned"]
     
@@ -835,16 +843,15 @@ Return ONLY the JSON object.
         # Generate summaries for each standard section
         summaries = {}
         
-        # STRATEGY SWITCH: Use Batching for Pro models (huge context), Sequential for Flash/Others
-        # 'gemini-1.5-pro' can handle the whole paper in one go.
-        # BATCHING DISABLED for reliability (Render timeouts)
-        # if "pro" in GEMINI_MODEL.lower() or "1.5" in GEMINI_MODEL:
-        #     logger.info(f"Using BATCH summarization strategy for model: {GEMINI_MODEL}")
-        #     batch_results = self._summarize_batch(mapped_sections)
-        #     if batch_results:
-        #         return batch_results
-        #     # If batch fails, fall through to sequential loop
-        
+        # STRATEGY SWITCH: Use Batching for Gemini models (huge context)
+        # This is significantly faster as it replaces 7 sequential network calls with 1.
+        if "gemini" in LLM_PROVIDER.lower():
+            logger.info(f"Using BATCH summarization strategy for model: {GEMINI_MODEL}")
+            batch_results = self._summarize_batch(mapped_sections)
+            if batch_results:
+                return batch_results
+            logger.warning("Batch summarization failed or returned empty. Falling back to sequential.")
+            
         logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL}")
 
         # Iterate through STANDARD_SECTIONS to maintain order and ensure we check all

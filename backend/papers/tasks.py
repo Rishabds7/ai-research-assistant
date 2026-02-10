@@ -129,12 +129,22 @@ def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
         paper.processed = True
         paper.save()
         
-        # 5. Trigger Async AI Tasks (Deep Analysis)
+        # 5. Trigger Async AI Tasks (Deep Analysis) IN PARALLEL
+        # We start EVERYTHING immediately so it's ready by the time user clicks
         details_task = identify_paper_details_task.delay(paper_id)
         embed_task = generate_embeddings_task.delay(paper_id)
+        summarize_task = extract_all_sections_task.delay(paper_id)
+        
+        # Also trigger fast metadata (datasets/licenses) automatically
+        ds_task = extract_metadata_task.delay(paper_id, 'datasets')
+        lic_task = extract_metadata_task.delay(paper_id, 'licenses')
         
         paper.task_ids['identify_details'] = details_task.id
         paper.task_ids['generate_embeddings'] = embed_task.id
+        paper.task_ids['summarize'] = summarize_task.id
+        paper.task_ids['datasets'] = ds_task.id
+        paper.task_ids['licenses'] = lic_task.id
+        
         paper.save(update_fields=['task_ids'])
         
         update_task_status(task_id, 'completed', result={'message': 'PDF processed (AI running in background)'})
@@ -407,66 +417,19 @@ def extract_metadata_task(self, paper_id: str, field: str) -> Dict[str, Any]:
         llm = LLMService()
         
         if field == 'datasets':
-            prompt = f"""Analyze the following paper text and list ALL datasets, databases, or data benchmarks used or created.
-Be thorough. If a dataset is mentioned by name (e.g., "ImageNet", "CoNLL-2003"), include it.
-Return ONLY a JSON array of strings. If absolutely no datasets are mentioned, return ["None mentioned"].
-
-Paper Text:
-{context}
-
-Return format: ["dataset1", "dataset2"]"""
+            result = llm.extract_datasets(context)
         elif field == 'licenses':
-            prompt = f"""Analyze the following paper text and list ALL software licenses or data usage terms mentioned.
-Look for "MIT", "Apache", "CC-BY", "GPL", or custom terms like "Research Use Only".
-Return ONLY a JSON array of strings. If absolutely no licenses are mentioned, return ["None mentioned"].
-
-Paper Text:
-{context}
-
-Return format: ["license1", "license2"]"""
+            result = llm.extract_licenses(context)
         else:
             error_msg = f'Invalid field: {field}'
             update_task_status(task_id, 'failed', error=error_msg)
             return {'error': error_msg}
         
-        # Execute LLM call
-        llm_class_name = llm.__class__.__name__
-        logger.info(f"Extracting {field} using LLM Class: {llm_class_name}")
-
-        if llm_class_name == 'GeminiLLMService':
-            # Gemini
-            logger.info(f"Generating metadata for {field} using Gemini...")
-            try:
-                response = llm._generate(prompt)
-                logger.info(f"Gemini Raw Response for {field} (Type: {type(response)}): {response}")
-                
-                from services.llm_service import _parse_json_safe
-                response_text = response if response else ""
-                
-                if not response:
-                    logger.warning(f"Gemini returned empty response for {field}")
-                
-                result = _parse_json_safe(response_text, ["None mentioned"])
-                logger.info(f"Parsed Result for {field}: {result}")
-            except Exception as e:
-                logger.error(f"Error during Gemini generation for {field}: {e}", exc_info=True)
-                result = ["None mentioned"]
-
-        elif llm_class_name == 'OllamaLLMService':
-            # Ollama
-            logger.info(f"Generating metadata for {field} using Ollama...")
-            response_text = llm._generate(prompt, json_mode=True)
-            from services.llm_service import _parse_json_safe
-            result = _parse_json_safe(response_text, ["None mentioned"])
-        else:
-            logger.warning(f"Unknown LLM Class: {llm_class_name}. Falling back.")
-            result = ["None mentioned"]
-        
         if not isinstance(result, list):
             result = ["None mentioned"]
         
         # Save to metadata
-        paper.metadata[field] = sanitize_text(result)
+        paper.metadata[field] = result
         paper.save(update_fields=['metadata'])
         
         update_task_status(task_id, 'completed', result={field: result})

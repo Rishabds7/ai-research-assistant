@@ -134,8 +134,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         onUpdate();
         setDatasetsTaskId(null);
         setIsDsRequesting(false);
-        // Auto-scroll to datasets after generation
-        setTimeout(() => scrollToSection(datasetsRef), 500);
+        setShowDatasets(true);
     });
 
     // Poll for licenses
@@ -143,8 +142,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         onUpdate();
         setLicensesTaskId(null);
         setIsLicRequesting(false);
-        // Auto-scroll to licenses after generation
-        setTimeout(() => scrollToSection(licensesRef), 500);
+        setShowLicenses(true);
     });
 
     const handleSummarize = async () => {
