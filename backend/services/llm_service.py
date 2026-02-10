@@ -501,37 +501,30 @@ Text:
 
     def extract_datasets(self, context: str) -> List[str]:
         """
-        Uses snippet-based isolation to find data sources. 
-        Better than full-text extraction for long documents as it avoids dilution.
+        Fast dataset extraction from paper text.
+        Datasets are usually mentioned in intro/methodology sections.
         
         Args:
-            context: Combined text snippets containing dataset keywords.
+            context: Paper text (ideally intro + methodology sections).
             
         Returns:
             List[str]: List of dataset names.
         """
-        snippets = _extract_dataset_snippets(context)
-        snippets_text = "\n---\n".join(snippets)
-        # LLM Call for identification
-        prompt = """Extract ALL specific data sources and datasets mentioned in these snippets from a research paper.
+        # Use first 25k chars (datasets are usually in intro / methodology)
+        text = context[:25000]
+        
+        prompt = """List ALL datasets and benchmarks mentioned in this research paper.
 
-Look for:
-- Standard Benchmarks (ImageNet, SQuAD, etc.)
-- Named local/custom datasets
-- Alternative sources like specific podcasts, newsletters, or web sources.
+Examples: ImageNet, COCO, SQuAD, MNIST, custom datasets, etc.
 
-Rules:
-1. Return ONLY a JSON array of specific names: ["Name1", "Name2", ...]
-2. Be specific (e.g., "ImageNet-1k" not just "ImageNet").
-3. Include names of podcasts/newsletters if explicitly mentioned.
-4. If NO specific sources or datasets are found, return ["None mentioned"].
-5. Deduplicate and normalize names.
+Return ONLY a JSON array: ["Dataset 1", "Dataset 2", ...]
+If none found, return: ["None mentioned"]
 
-Snippets:
-""" + snippets_text
+Paper text:
+""" + text
+
         raw = self._generate(prompt, use_flash=True)
-        result = _parse_json_safe(raw, ["None mentioned"])
-        return result if result else ["None mentioned"]
+        return _parse_json_safe(raw, ["None mentioned"])
     
     def analyze_research_gaps(self, paper_contexts: List[Dict[str, str]]) -> str:
         """Identical to Gemini implementation - delegates to Ollama."""
@@ -601,9 +594,8 @@ Analyze the following papers and provide:
 
     def extract_licenses(self, paper_text: str) -> List[str]:
         """
-        Hyper-accurate license scanner.
-        Combines targeted snippet extraction for high-signal areas 
-        with full-text scanning for global context.
+        Fast license extraction using targeted context.
+        Uses first 20K + last 10K chars where licenses are typically found.
         
         Args:
             paper_text: Full text of the paper.
@@ -611,73 +603,28 @@ Analyze the following papers and provide:
         Returns:
             List[str]: List of identified licenses.
         """
-        # 1. Target the High-Signal areas first (Head, Tail, Acknowledgments)
-        head = paper_text[:15000].replace('\n', ' ')
-        tail = paper_text[-15000:].replace('\n', ' ')
+        # First 20k and last 10k contain licenses 99% of the time
+        head = paper_text[:20000]
+        tail = paper_text[-10000:] if len(paper_text) > 10000 else ""
         
-        # Look for specific structural sections in the full text
-        structural = ""
-        for section in ["acknowledgments", "appendix", "data availability", "code availability", "software availability"]:
-            match = re.search(rf"\b{section}\b", paper_text, re.IGNORECASE)
-            if match:
-                start = max(0, match.start() - 1000)
-                end = min(len(paper_text), match.end() + 5000)
-                structural += f"\n[SECTION: {section.upper()}]\n{paper_text[start:end]}\n"
-
-        # 2. Prepare the Global Context (Capped to 150k for speed/cost)
-        global_context = paper_text[:150000]
+        context = f"""[BEGINNING OF PAPER]\n{head}\n\n[END OF PAPER]\n{tail}"""
         
-        prompt = """You are a professional license auditor. Analyze the paper text below and identify ALL software, data, or content licenses.
+        prompt = """Identify software and data licenses mentioned in this research paper.
 
-Rules:
-1. Return ONLY a JSON LIST of strings: ["MIT License", "CC BY 4.0", ...]
-2. ONLY include actual LEGAL LICENSES. 
-3. DO NOT include software frameworks or libraries (e.g., "TensorFlow", "PyTorch", "JAX", "NumPy")—these are NOT licenses.
-4. If NO valid licenses are found, return ["None mentioned"].
-5. Standardize names using the list of common licenses below as a reference.
+Common licenses:
+- MIT License, Apache 2.0, BSD, GPL, LGPL
+- CC BY 4.0, CC BY-SA 4.0, CC BY-NC 4.0, CC0
+- Public Domain
 
-POSSIBLE LICENSES TO IDENTIFY:
-- Creative Commons: CC BY, CC BY-SA, CC BY-ND, CC BY-NC, CC BY-NC-SA, CC BY-NC-ND, CC0
-- Software: MIT License, Apache License 2.0, BSD 2-Clause, BSD 3-Clause, ISC License, Boost Software License 1.0, zlib License
-- GNU: GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, AGPL-3.0
-- Other: Mozilla Public License 2.0 (MPL-2.0), Eclipse Public License 2.0 (EPL-2.0), CDDL-1.0
-- Database/Data: Open Database License (ODbL), ODC-By, PDDL, Public Domain Mark
-- AI/ML Specific: CreativeML OpenRAIL-M, BigScience OpenRAIL-M, OpenRAIL-M
-- Research Terms: "available for non-commercial research", "restricted use", "citation required"
+Return ONLY a JSON array: ["License Name 1", "License Name 2", ...]
+If no licenses found, return: ["None mentioned"]
 
-Paper Context for Deep Audit:
----
-[BEGINNING]
-""" + head + """
+Paper text:
+""" + context
 
-[STRUCTURAL SECTIONS]
-""" + structural + """
+        raw = self._generate(prompt, use_flash=True)
+        return _parse_json_safe(raw, ["None mentioned"])
 
-[END OF DOCUMENT]
-""" + tail + """
-
-[FULL PAPER SCAN (Truncated for performance)]
-""" + global_context + """
----
-
-Return ONLY the JSON list of strings."""
-
-        raw = self._generate(prompt)
-        items = _parse_json_safe(raw, ["None mentioned"])
-        
-        # Clean results
-        cleaned = []
-        seen = set()
-        for i in items:
-            if not isinstance(i, str): continue
-            val = i.strip().strip('"').strip("'")
-            if val and val.lower() not in seen:
-                cleaned.append(val)
-                seen.add(val.lower())
-        
-        # If we got junk or empty after cleaning
-        if not cleaned: return ["None mentioned"]
-        
         # If "None mentioned" is one of many, remove it
         if len(cleaned) > 1 and "None mentioned" in cleaned:
             cleaned = [c for c in cleaned if c != "None mentioned"]
