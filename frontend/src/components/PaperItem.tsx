@@ -292,18 +292,18 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         <Card ref={cardRef} className="bg-white shadow-xl rounded-2xl overflow-hidden border-2 border-[#F1E9D2] transition-all duration-500 hover:shadow-2xl hover:border-[#D4AF37]/30">
             <CardHeader className="bg-white border-b-2 border-slate-100 pb-7 pt-8 px-10">
                 <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-5">
-                        <div className="bg-[#1A365D] p-3 rounded-xl shadow-lg shadow-blue-900/10 transform transition-transform group-hover:scale-105">
+                    <div className="flex items-center gap-5 min-w-0 flex-1 mr-4">
+                        <div className="bg-[#1A365D] p-3 rounded-xl shadow-lg shadow-blue-900/10 transform transition-transform group-hover:scale-105 shrink-0">
                             <FileText className="h-6 w-6 text-white" />
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-1 min-w-0">
                             {paper.processed === false && paper.uploadTaskId === 'failed' && paper.title?.startsWith("NON-RESEARCH") ? (
                                 <div className="text-red-600 font-extrabold flex items-center gap-2 text-sm uppercase tracking-wide">
                                     <X className="h-4 w-4" />
                                     <span>Rejected: Non-Academic Content</span>
                                 </div>
                             ) : (
-                                <CardTitle className="text-xl font-extrabold text-[#1A365D] tracking-tight leading-none group-hover:text-[#D4AF37] transition-colors">
+                                <CardTitle className="text-xl font-extrabold text-[#1A365D] tracking-tight leading-none group-hover:text-[#D4AF37] transition-colors truncate" title={paper.filename}>
                                     {paper.filename}
                                 </CardTitle>
                             )}
