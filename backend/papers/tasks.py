@@ -138,7 +138,7 @@ Return ONLY valid JSON:
                     'year': 'Unknown',
                     'journal': 'Unknown'
                 })
-            elif hasattr(llm, '_generate'):
+            elif llm.__class__.__name__ == 'OllamaLLMService':
                 # Ollama
                 response_text = llm._generate(metadata_prompt, json_mode=True)
                 from services.llm_service import _parse_json_safe
@@ -326,7 +326,7 @@ Return ONLY the TL;DR summary:"""
                 response = llm._generate_with_retry(global_summary_prompt)
                 from services.llm_service import _get_response_text
                 global_summary = _get_response_text(response)
-            elif hasattr(llm, '_generate'):
+            elif llm.__class__.__name__ == 'OllamaLLMService':
                 # Ollama
                 global_summary = llm._generate(global_summary_prompt, json_mode=False)
             else:
@@ -424,7 +424,7 @@ Return format: ["license1", "license2"]"""
             from services.llm_service import _get_response_text, _parse_json_safe
             response_text = _get_response_text(response)
             result = _parse_json_safe(response_text, ["None mentioned"])
-        elif hasattr(llm, '_generate'):
+        elif llm.__class__.__name__ == 'OllamaLLMService':
             # Ollama
             response_text = llm._generate(prompt, json_mode=True)
             from services.llm_service import _parse_json_safe
