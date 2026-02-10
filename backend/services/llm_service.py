@@ -797,10 +797,11 @@ Return ONLY the JSON object.
         # REVERT TO SEQUENTIAL: Batching with Pro model was causing timeouts and incomplete JSON on Render.
         # We will use the Pro model's intelligence but process section-by-section for reliability.
         if "pro" in GEMINI_MODEL.lower() or "1.5" in GEMINI_MODEL:
-             logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL} (Batching Disabled for Reliability)")
-             # Fall through to the sequential loop below
+            logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL} (Batching Disabled for Reliability)")
         else:
-             logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL}")
+            logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL}")
+
+        if full_text:
 
             if not mapped_sections.get('Introduction') or len(mapped_sections['Introduction']) < 100:
                 mapped_sections['Introduction'] = full_text[2000:15000]
@@ -835,12 +836,13 @@ Return ONLY the JSON object.
         
         # STRATEGY SWITCH: Use Batching for Pro models (huge context), Sequential for Flash/Others
         # 'gemini-1.5-pro' can handle the whole paper in one go.
-        if "pro" in GEMINI_MODEL.lower() or "1.5" in GEMINI_MODEL:
-            logger.info(f"Using BATCH summarization strategy for model: {GEMINI_MODEL}")
-            batch_results = self._summarize_batch(mapped_sections)
-            if batch_results:
-                return batch_results
-            # If batch fails, fall through to sequential loop
+        # BATCHING DISABLED for reliability (Render timeouts)
+        # if "pro" in GEMINI_MODEL.lower() or "1.5" in GEMINI_MODEL:
+        #     logger.info(f"Using BATCH summarization strategy for model: {GEMINI_MODEL}")
+        #     batch_results = self._summarize_batch(mapped_sections)
+        #     if batch_results:
+        #         return batch_results
+        #     # If batch fails, fall through to sequential loop
         
         logger.info(f"Using SEQUENTIAL summarization strategy for model: {GEMINI_MODEL}")
 
