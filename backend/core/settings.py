@@ -182,5 +182,6 @@ GEMINI_API_KEY = env('GEMINI_API_KEY', default=env('GOOGLE_API_KEY', default='')
 if GEMINI_API_KEY:
     os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 GEMINI_MODEL = env('GEMINI_MODEL', default='gemini-2.5-pro')
+GEMINI_FLASH_MODEL = env('GEMINI_FLASH_MODEL', default='gemini-2.0-flash')
 OLLAMA_HOST = env('OLLAMA_HOST', default='http://localhost:11434')
 OLLAMA_MODEL = env('OLLAMA_MODEL', default='llama3')

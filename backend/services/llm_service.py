@@ -37,6 +37,7 @@ from django.conf import settings
 # These determine whether we use a remote API (Gemini) or a local host (Ollama).
 GEMINI_API_KEY = settings.GEMINI_API_KEY
 GEMINI_MODEL = settings.GEMINI_MODEL
+GEMINI_FLASH_MODEL = getattr(settings, 'GEMINI_FLASH_MODEL', 'gemini-2.0-flash')
 LLM_PROVIDER = settings.LLM_PROVIDER
 OLLAMA_HOST = settings.OLLAMA_HOST
 OLLAMA_MODEL = settings.OLLAMA_MODEL
@@ -396,10 +397,10 @@ class GeminiLLMService:
         # FLASH MODEL for fast-path tasks (Metadata, Datasets, Licenses)
         try:
             self.flash_model = genai.GenerativeModel(
-                model_name="gemini-2.0-flash",
+                model_name=GEMINI_FLASH_MODEL,
                 generation_config={"temperature": 0.1}
             )
-            logger.info(f"LLM: Initialized Gemini service (Pro: {GEMINI_MODEL}, Flash: gemini-2.0-flash)")
+            logger.info(f"LLM: Initialized Gemini service (Pro: {GEMINI_MODEL}, Flash: {GEMINI_FLASH_MODEL})")
         except Exception as e:
             logger.warning(f"Flash model unavailable: {e}. Using Pro for all tasks.")
             self.flash_model = None
