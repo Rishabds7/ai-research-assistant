@@ -126,28 +126,9 @@ Return ONLY valid JSON:
   "journal": "Journal Name"
 }}"""
             
-            # Use the backend's _generate method directly for this custom prompt
-            if hasattr(llm, '_generate_with_retry'):
-                # Gemini
-                response = llm._generate(metadata_prompt)
-                from services.llm_service import _get_response_text, _parse_json_safe
-                response_text = _get_response_text(response)
-                metadata = _parse_json_safe(response_text, {
-                    'title': paper.filename,
-                    'authors': [],
-                    'year': 'Unknown',
-                    'journal': 'Unknown'
-                })
-            elif hasattr(llm, '_generate'):
-                # Ollama
-                response_text = llm._generate(metadata_prompt, json_mode=True)
-                from services.llm_service import _parse_json_safe
-                metadata = _parse_json_safe(response_text, {
-                    'title': paper.filename,
-                    'authors': [],
-                    'year': 'Unknown',
-                    'journal': 'Unknown'
-                })
+            
+            # Use LLM's built-in extract_paper_info method
+            metadata = llm.extract_paper_info(context)
             else:
                 # Fallback
                 metadata = {
@@ -182,7 +163,7 @@ Return ONLY valid JSON:
         # Generate Embeddings  
         embedding_service = EmbeddingService()
         try:
-            embedding_service.generate_paper_embeddings(paper)
+            embedding_service.store_embeddings(paper, json.loads(paper.sections))
         except Exception as embed_error:
             logger.warning(f"Embedding generation failed for paper {paper_id}: {embed_error}")
         
