@@ -59,22 +59,27 @@ class EmbeddingService:
         
         for model in models_to_try:
             try:
-                # Test with output_dimensionality if it's text-embedding-004
-                if "text-embedding-004" in model:
-                    genai.embed_content(
-                        model=model, 
-                        content=test_text, 
-                        task_type="retrieval_document",
-                        output_dimensionality=768
-                    )
-                else:
-                    genai.embed_content(model=model, content=test_text, task_type="retrieval_document")
+                # Force 768 dimensions for all models (Legacy models might ignore this, but it won't crash)
+                genai.embed_content(
+                    model=model, 
+                    content=test_text, 
+                    task_type="retrieval_document",
+                    output_dimensionality=768
+                )
                 self.model_name = model
                 self._model_confirmed = True
-                logger.info(f"EMBEDDING: Confirmed working model: {model}")
+                logger.info(f"EMBEDDING: Confirmed working model: {model} (Force 768 Dims)")
                 return
             except Exception:
-                continue
+                try:
+                    # Fallback for models that don't support output_dimensionality
+                    genai.embed_content(model=model, content=test_text, task_type="retrieval_document")
+                    self.model_name = model
+                    self._model_confirmed = True
+                    logger.info(f"EMBEDDING: Confirmed working model: {model} (Native Dims)")
+                    return
+                except Exception:
+                    continue
         
     def generate_embedding(self, text: str) -> List[float]:
         """
@@ -98,11 +103,9 @@ class EmbeddingService:
                 "model": self.model_name,
                 "content": text,
                 "task_type": "retrieval_document",
-                "title": "Research Paper Chunk"
+                "title": "Research Paper Chunk",
+                "output_dimensionality": 768 # Force 768
             }
-            
-            if "text-embedding-004" in self.model_name:
-                kwargs["output_dimensionality"] = 768
 
             result = genai.embed_content(**kwargs)
             
@@ -187,9 +190,13 @@ class EmbeddingService:
                 result = genai.embed_content(**kwargs)
                 
                 for idx, vec in enumerate(result['embedding']):
+                    # Robust handling of dimension mismatch
                     if len(vec) != 768:
-                        logger.warning(f"Batch embedding dimension mismatch: {len(vec)}. Skipping.")
-                        continue
+                        logger.warning(f"Batch dimension mismatch: {len(vec)}. Truncating/Padding to 768.")
+                        if len(vec) > 768:
+                            vec = vec[:768]
+                        else:
+                            vec = vec + [0.0] * (768 - len(vec))
                         
                     embeddings_to_create.append(
                         EmbeddingModel(
@@ -237,9 +244,12 @@ class EmbeddingService:
             result = genai.embed_content(
                 model=self.model_name,
                 content=query,
-                task_type="retrieval_query"
+                task_type="retrieval_query",
+                output_dimensionality=768 # Force 768 for search too
             )
             query_vec = result['embedding']
+            if len(query_vec) != 768:
+                query_vec = query_vec[:768] if len(query_vec) > 768 else query_vec + [0.0] * (768 - len(query_vec))
         except Exception as e:
             logger.error(f"Google Search Embedding Error: {e}")
             return []
