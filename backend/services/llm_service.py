@@ -397,9 +397,9 @@ class GeminiLLMService:
         Returns:
             Optional[str]: The LLM's text response, or None if completely failed after long wait.
         """
-        # 15 retries * ~30-60s avg delay = ~10-15 minutes of patience
-        max_retries = 15
-        base_delay = 5 
+        # Reduced retries to avoid long hangs
+        max_retries = 3
+        base_delay = 2 
 
         for attempt in range(max_retries + 1):
             try:

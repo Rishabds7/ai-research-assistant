@@ -419,22 +419,36 @@ Return format: ["license1", "license2"]"""
             return {'error': error_msg}
         
         # Execute LLM call
-        if llm.__class__.__name__ == 'GeminiLLMService':
+        llm_class_name = llm.__class__.__name__
+        logger.info(f"Extracting {field} using LLM Class: {llm_class_name}")
+
+        if llm_class_name == 'GeminiLLMService':
             # Gemini
             logger.info(f"Generating metadata for {field} using Gemini...")
-            response = llm._generate(prompt)
-            logger.info(f"Gemini Raw Response for {field}: {response}")
-            
-            from services.llm_service import _parse_json_safe
-            response_text = response if response else ""
-            result = _parse_json_safe(response_text, ["None mentioned"])
-            logger.info(f"Parsed Result for {field}: {result}")
-        elif llm.__class__.__name__ == 'OllamaLLMService':
+            try:
+                response = llm._generate(prompt)
+                logger.info(f"Gemini Raw Response for {field} (Type: {type(response)}): {response}")
+                
+                from services.llm_service import _parse_json_safe
+                response_text = response if response else ""
+                
+                if not response:
+                    logger.warning(f"Gemini returned empty response for {field}")
+                
+                result = _parse_json_safe(response_text, ["None mentioned"])
+                logger.info(f"Parsed Result for {field}: {result}")
+            except Exception as e:
+                logger.error(f"Error during Gemini generation for {field}: {e}", exc_info=True)
+                result = ["None mentioned"]
+
+        elif llm_class_name == 'OllamaLLMService':
             # Ollama
+            logger.info(f"Generating metadata for {field} using Ollama...")
             response_text = llm._generate(prompt, json_mode=True)
             from services.llm_service import _parse_json_safe
             result = _parse_json_safe(response_text, ["None mentioned"])
         else:
+            logger.warning(f"Unknown LLM Class: {llm_class_name}. Falling back.")
             result = ["None mentioned"]
         
         if not isinstance(result, list):
