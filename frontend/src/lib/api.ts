@@ -77,6 +77,8 @@ export interface Paper {
         datasets?: string;
         licenses?: string;
         swot_analysis?: string;
+        identify_details?: string;
+        generate_embeddings?: string;
     };
     uploadTaskId?: string;
     title?: string;

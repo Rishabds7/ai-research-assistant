@@ -32,6 +32,9 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const [licensesTaskId, setLicensesTaskId] = useState<string | null>(
         (!paper.metadata?.licenses || paper.metadata.licenses.length === 0) ? (paper.task_ids?.licenses || null) : null
     );
+    const [detailsTaskId, setDetailsTaskId] = useState<string | null>(
+        (paper.authors === "Processing..." || paper.title === "Extracting...") ? (paper.task_ids?.identify_details || null) : null
+    );
     const [swotTaskId, setSwotTaskId] = useState<string | null>(null);
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
     const [isSummariesVisible, setIsSummariesVisible] = useState(true);
@@ -96,9 +99,12 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
         if (paper.task_ids?.licenses && (!paper.metadata?.licenses || paper.metadata.licenses.length === 0)) {
             setLicensesTaskId(paper.task_ids.licenses);
         }
+        if (paper.task_ids?.identify_details && (paper.authors === "Processing..." || paper.title === "Extracting...")) {
+            setDetailsTaskId(paper.task_ids.identify_details);
+        }
         if (paper.task_ids?.datasets) setShowDatasets(true);
         if (paper.task_ids?.licenses) setShowLicenses(true);
-    }, [paper.task_ids, paper.section_summaries, paper.metadata, paper.processed, paper.uploadTaskId]);
+    }, [paper.task_ids, paper.section_summaries, paper.metadata, paper.processed, paper.uploadTaskId, paper.authors, paper.title]);
 
 
 
@@ -106,6 +112,12 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
     const { status: processStatus } = useTaskPoll(processTaskId, () => {
         onUpdate();
         setProcessTaskId(null);
+    });
+
+    // Poll for deep metadata (Title/Authors)
+    const { status: detailsStatus } = useTaskPoll(detailsTaskId, () => {
+        onUpdate();
+        setDetailsTaskId(null);
     });
 
 
@@ -278,7 +290,17 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
 
     const renderAuthors = () => {
         if (!paper.authors || paper.authors === "Unknown") return "Not Available";
+
+        // Handle "Processing..." string from backend serializer
+        if (paper.authors === "Processing...") return (
+            <span className="flex items-center gap-2 text-slate-400 italic font-medium">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Refining authors...
+            </span>
+        );
+
         try {
+            // Some versions might still return JSON strings
             const parsed = JSON.parse(paper.authors);
             if (Array.isArray(parsed)) {
                 if (parsed[0] === "Processing...") return (
@@ -290,7 +312,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                 return parsed.join(", ");
             }
         } catch (e) {
-            // Not JSON
+            // Not JSON or already a string
         }
         return paper.authors;
     };
