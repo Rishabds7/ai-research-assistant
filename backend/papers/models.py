@@ -185,7 +185,7 @@ class Embedding(models.Model):
     paper = models.ForeignKey(Paper, on_delete=models.CASCADE, related_name='embeddings')
     section_name = models.CharField(max_length=100, blank=True)
     text = models.TextField() # The raw text segment that was embedded
-    embedding = VectorField(dimensions=3072)  # 3072-dim vector for Google text-embedding-004 (High precision)
+    embedding = VectorField(dimensions=768)  # 768-dim vector for Google text-embedding-004
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
