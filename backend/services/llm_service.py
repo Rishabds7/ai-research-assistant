@@ -1233,6 +1233,19 @@ Analyze the following papers and provide:
             
             if mapped_content:
                 mapped_sections[standard_section] = '\n\n'.join(mapped_content)
+
+        # Fallback Logic (Smart Slicing) if specific sections are missing
+        if full_text:
+            if not mapped_sections.get('Introduction') or len(mapped_sections['Introduction']) < 100:
+                mapped_sections['Introduction'] = full_text[1000:10000]
+            if not mapped_sections.get('Background') or len(mapped_sections['Background']) < 100:
+                mapped_sections['Background'] = full_text[int(len(full_text)*0.1):int(len(full_text)*0.3)]
+            if not mapped_sections.get('Methodology') or len(mapped_sections['Methodology']) < 100:
+                mapped_sections['Methodology'] = full_text[int(len(full_text)*0.25):int(len(full_text)*0.55)]
+            if not mapped_sections.get('Results') or len(mapped_sections['Results']) < 100:
+                mapped_sections['Results'] = full_text[int(len(full_text)*0.6):int(len(full_text)*0.9)]
+            if not mapped_sections.get('Conclusion') or len(mapped_sections['Conclusion']) < 100:
+                mapped_sections['Conclusion'] = full_text[-10000:]
         
         # Generate summaries for each standard section
         summaries = {}

@@ -313,7 +313,7 @@ def extract_all_sections_task(self, paper_id: str) -> Dict[str, str]:
         
         sections = paper.sections or {}
         llm = LLMService()
-        summaries_dict = llm.summarize_sections(sections)
+        summaries_dict = llm.summarize_sections(sections, paper.full_text)
         
         # Delete existing section summaries
         SectionSummary.objects.filter(paper=paper).delete()

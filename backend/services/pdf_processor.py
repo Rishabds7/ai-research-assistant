@@ -176,8 +176,9 @@ class PDFProcessor:
         sections: Dict[str, str] = {}
         text_lower = text.lower()
         
-        # Pass 1: Generic Numbered Headers
-        generic_header_pat = r"(?:\n|^)((?:\d+\.)*\d+\.?\s+([A-Z][A-Za-z\s]{3,60}))\s*(?:\n|$)"
+        # Pass 1: Generic Numbered Headers (Supports Arabic 1.1 and Roman II.)
+        # Optimized to catch ALL CAPS academic headers as well.
+        generic_header_pat = r"(?:\n|^)((?:(?:[IVXLCDM]+\b|[0-9]+)\.?\s+)+([A-Z][A-Z\s]{2,60}))\s*(?:\n|$)"
         matches = list(re.finditer(generic_header_pat, text))
         
         discovered_headers = []
@@ -195,10 +196,9 @@ class PDFProcessor:
 
         # Pass 2: Keyword-based matching for standard academic sections
         for section_name in self.SECTION_PATTERNS:
-            # IMPROVED REGEX: Matches "Abstract:", "Abstract.", "1. Abstract" 
-            # and crucially stops matching BEFORE the content starts, so inline content isn't lost.
-            # \b ensures we don't match "AbstractVector"
-            pattern = rf"(?:\n|^)\s*(?:\d+\.?\s*)?{re.escape(section_name)}\b[:.]?\s*"
+            # IMPROVED REGEX: Supports Arabic and Roman numbering prefixes
+            # e.g., "1. Introduction", "II. Background", "Abstract"
+            pattern = rf"(?:\n|^)\s*(?:(?:[IVXLCDM]+\b|[0-9]+)\.?\s*)?{re.escape(section_name)}\b[:.]?\s*"
             match = re.search(pattern, text_lower, re.IGNORECASE)
             
             if match:
@@ -208,7 +208,7 @@ class PDFProcessor:
                 # Look ahead for the next major keyword boundary
                 for other in self.SECTION_PATTERNS:
                     if other == section_name: continue
-                    p = rf"\n\s*(?:\d+\.?\s*)?{re.escape(other)}\b[:.]?\s*"
+                    p = rf"\n\s*(?:(?:[IVXLCDM]+\b|[0-9]+)\.?\s*)?{re.escape(other)}\b[:.]?\s*"
                     m = re.search(p, text_lower[start:], re.IGNORECASE)
                     if m:
                         cand = start + m.start()
