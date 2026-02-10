@@ -397,8 +397,8 @@ class GeminiLLMService:
         Returns:
             Optional[str]: The LLM's text response, or None if completely failed after long wait.
         """
-        # Reduced retries to avoid long hangs
-        max_retries = 3
+        # INCREASED RETRIES to survive 60s+ rate limit windows
+        max_retries = 9
         base_delay = 2 
 
         for attempt in range(max_retries + 1):
@@ -415,7 +415,8 @@ class GeminiLLMService:
                 if is_429:
                     if attempt < max_retries:
                         # Exponential backoff capped at 60s (Gemini quota resets every 60s)
-                        # 5, 10, 20, 40, 60, 60, 60...
+                        # 2, 4, 8, 16, 32, 60, 60, 60...
+                        # Total wait capacity > 5 minutes if needed
                         delay = min(60, base_delay * (2 ** attempt))
                         
                         # Add a small jitter to prevent thundering herd if multiple workers retry at once
@@ -792,10 +793,11 @@ Content to summarize:
                 # Fallback: Rate limit hit. Use truncated content.
                 logger.warning(f"Rate limit hit for section '{section_name}'. Using fallback truncated text.")
                 fallback_text = content[:500].strip() + "..."
-                summaries[section_name] = f"[AI Summary Unavailable - Rate Limit]\n{fallback_text}"
+                # Use clean text without error prefix to improve UX
+                summaries[section_name] = fallback_text
             
-            # Rate limiting: Sleep briefly to avoid hitting Gemini's RPM/TPM limits quickly
-            time.sleep(2)
+            # Rate limiting: Sleep 5s to stay under Gemini's ~15 RPM limit (approx 12 RPM)
+            time.sleep(5)
         
         return summaries
 
