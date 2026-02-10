@@ -129,7 +129,7 @@ Return ONLY valid JSON:
             # Use the backend's _generate method directly for this custom prompt
             if hasattr(llm.backend, '_generate_with_retry'):
                 # Gemini
-                response = llm.backend._generate_with_retry(metadata_prompt)
+                response = llm._generate(metadata_prompt)
                 from services.llm_service import _get_response_text, _parse_json_safe
                 response_text = _get_response_text(response)
                 metadata = _parse_json_safe(response_text, {
@@ -140,7 +140,7 @@ Return ONLY valid JSON:
                 })
             elif hasattr(llm.backend, '_generate'):
                 # Ollama
-                response_text = llm.backend._generate(metadata_prompt, json_mode=True)
+                response_text = llm._generate(metadata_prompt, json_mode=True)
                 from services.llm_service import _parse_json_safe
                 metadata = _parse_json_safe(response_text, {
                     'title': paper.filename,
@@ -323,12 +323,12 @@ Return ONLY the TL;DR summary:"""
             
             if hasattr(llm.backend, '_generate_with_retry'):
                 # Gemini
-                response = llm.backend._generate_with_retry(global_summary_prompt)
+                response = llm._generate(global_summary_prompt)
                 from services.llm_service import _get_response_text
                 global_summary = _get_response_text(response)
             elif hasattr(llm.backend, '_generate'):
                 # Ollama
-                global_summary = llm.backend._generate(global_summary_prompt, json_mode=False)
+                global_summary = llm._generate(global_summary_prompt, json_mode=False)
             else:
                 global_summary = "Summary not available"
             
@@ -420,13 +420,13 @@ Return format: ["license1", "license2"]"""
         # Execute LLM call
         if hasattr(llm.backend, '_generate_with_retry'):
             # Gemini
-            response = llm.backend._generate_with_retry(prompt)
+            response = llm._generate(prompt)
             from services.llm_service import _get_response_text, _parse_json_safe
             response_text = _get_response_text(response)
             result = _parse_json_safe(response_text, ["None mentioned"])
         elif hasattr(llm.backend, '_generate'):
             # Ollama
-            response_text = llm.backend._generate(prompt, json_mode=True)
+            response_text = llm._generate(prompt, json_mode=True)
             from services.llm_service import _parse_json_safe
             result = _parse_json_safe(response_text, ["None mentioned"])
         else:
