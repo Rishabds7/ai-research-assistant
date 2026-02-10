@@ -183,5 +183,6 @@ if GEMINI_API_KEY:
     os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 GEMINI_MODEL = env('GEMINI_MODEL', default='gemini-2.5-pro')
 GEMINI_FLASH_MODEL = env('GEMINI_FLASH_MODEL', default='gemini-2.0-flash')
+GEMINI_REQUEST_DELAY = float(env('GEMINI_REQUEST_DELAY', default='0.5'))  # seconds between requests
 OLLAMA_HOST = env('OLLAMA_HOST', default='http://localhost:11434')
 OLLAMA_MODEL = env('OLLAMA_MODEL', default='llama3')

@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 import google.generativeai as genai
 import requests
+import threading
 from google.api_core import exceptions as google_exceptions
 
 from django.conf import settings
@@ -27,6 +28,7 @@ from django.conf import settings
 GEMINI_API_KEY = settings.GEMINI_API_KEY
 GEMINI_MODEL = settings.GEMINI_MODEL
 GEMINI_FLASH_MODEL = getattr(settings, 'GEMINI_FLASH_MODEL', 'gemini-2.0-flash')
+GEMINI_REQUEST_DELAY = getattr(settings, 'GEMINI_REQUEST_DELAY', 0.5)
 LLM_PROVIDER = settings.LLM_PROVIDER
 OLLAMA_HOST = settings.OLLAMA_HOST
 OLLAMA_MODEL = settings.OLLAMA_MODEL
@@ -393,6 +395,10 @@ class GeminiLLMService:
         except Exception as e:
             logger.warning(f"Flash model unavailable: {e}. Using Pro for all tasks.")
             self.flash_model = None
+        
+        # Rate limit prevention
+        self._last_request_time = 0
+        self._request_lock = threading.Lock()
 
     def _generate(self, prompt: str, **kwargs) -> Optional[str]:
         """
@@ -405,6 +411,15 @@ class GeminiLLMService:
         Returns:
             Optional[str]: The LLM's text response, or None if completely failed after long wait.
         """
+        # Rate limit prevention: Throttle requests
+        with self._request_lock:
+            elapsed = time.time() - self._last_request_time
+            if elapsed < GEMINI_REQUEST_DELAY:
+                sleep_time = GEMINI_REQUEST_DELAY - elapsed
+                logger.debug(f"Throttling: sleeping {sleep_time:.2f}s to prevent rate limit")
+                time.sleep(sleep_time)
+            self._last_request_time = time.time()
+        
         # INCREASED RETRIES to survive 60s+ rate limit windows
         max_retries = 9
         base_delay = 2 
