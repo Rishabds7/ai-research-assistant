@@ -764,40 +764,81 @@ Return ONLY the JSON list of strings."""
             if not mapped_sections.get('Conclusion') or len(mapped_sections['Conclusion']) < 100:
                 mapped_sections['Conclusion'] = full_text[-12000:]
         
-        # Generate summaries for each standard section
+        # BATCH OPTIMIZATION:
+        # Instead of 7 separate API calls (hitting rate limits), we send ONE large prompt.
+        # This leverages Gemini's massive context window and reduces RPM usage.
+        
         summaries = {}
-        # Iterate through STANDARD_SECTIONS to maintain order and ensure we check all
+        
+        # 1. Construct the batch payload
+        batch_context = ""
+        valid_sections = []
+        
         for section_name in STANDARD_SECTIONS:
             content = mapped_sections.get(section_name)
             if not content or len(content.strip()) < 50:
                 continue
-                
-            prompt = f"""You are a senior research scientist. Provide a high-density, technical executive summary of the "{section_name}" section from a research paper.
+            
+            clean_text = self._pre_clean_content(content)[:20000] # Increased cap for batching
+            batch_context += f"\n<<< SECTION: {section_name} >>>\n{clean_text}\n"
+            valid_sections.append(section_name)
+            
+        if not batch_context:
+            return {}
 
-CONSTRAINTS:
-1. Provide exactly 6-8 comprehensive bullet points. 
-2. Each point MUST start with a '-' symbol.
-3. Each point MUST be a complete, self-contained technical insight (do not split one sentence into two points).
-4. Each point MUST be a single, long-form continuous line.
-5. NO introductory text, NO meta-commentary.
-6. MANDATORY: Fix any broken words or line-breaks from the source text. 
-
-Content to summarize:
-{self._pre_clean_content(content)[:15000]}"""
-            
-            raw_summary = self._generate(prompt)
-            
-            if raw_summary:
-                summaries[section_name] = clean_llm_summary(raw_summary)
-            else:
-                # Fallback: Rate limit hit. Use truncated content.
-                logger.warning(f"Rate limit hit for section '{section_name}'. Using fallback truncated text.")
-                fallback_text = content[:500].strip() + "..."
-                # Use clean text without error prefix to improve UX
-                summaries[section_name] = fallback_text
-            
-            # Rate limiting: Sleep 5s to stay under Gemini's ~15 RPM limit (approx 12 RPM)
-            time.sleep(5)
+        # 2. Construct the system prompt
+        prompt = f"""You are a senior research scientist. Summarize the following research paper sections.
+        
+        INPUT TEXT:
+        {batch_context}
+        
+        TASK:
+        Return a purely JSON object where keys are the Section Names (e.g., "Abstract") and values are the summaries.
+        
+        SUMMARY RULES for EACH section:
+        1. Provide exactly 6-8 comprehensive bullet points. 
+        2. Each point MUST start with a '-' symbol.
+        3. Each point MUST be a complete, self-contained technical insight.
+        4. NO introductory text, NO meta-commentary inside the value.
+        
+        EXAMPLE OUPUT FORMAT:
+        {{
+            "Abstract": "- Point 1\\n- Point 2...",
+            "Introduction": "- Point 1..."
+        }}
+        
+        Provide ONLY the JSON output.
+        """
+        
+        # 3. Call LLM (Single Request)
+        raw_response = self._generate(prompt)
+        
+        # 4. Parse and Clean
+        if raw_response:
+            parsed = _parse_json_safe(raw_response)
+            if isinstance(parsed, dict):
+                for section in valid_sections:
+                    # Robust retrieval (handle case-sensitivity or partial matching if LLM errs)
+                    # Try exact match first
+                    summary_text = parsed.get(section)
+                    
+                    if not summary_text:
+                        # Fallback: try case-insensitive lookup
+                        for k, v in parsed.items():
+                            if k.lower() == section.lower():
+                                summary_text = v
+                                break
+                    
+                    if summary_text:
+                        # Ensure it's a string and clean it
+                        if isinstance(summary_text, list):
+                            summary_text = "\n".join([f"- {s}" for s in summary_text])
+                        
+                        summaries[section] = clean_llm_summary(str(summary_text))
+                    else:
+                        # If LLM missed a section in the JSON, use a placeholder or retry?
+                        # For now, just leave it missing or use fallback
+                        pass
         
         return summaries
 
