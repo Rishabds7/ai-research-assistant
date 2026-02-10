@@ -126,17 +126,8 @@ Return ONLY valid JSON:
   "journal": "Journal Name"
 }}"""
             
-            
             # Use LLM's built-in extract_paper_info method
             metadata = llm.extract_paper_info(context)
-            else:
-                # Fallback
-                metadata = {
-                    'title': paper.filename,
-                    'authors': [],
-                    'year': 'Unknown',
-                    'journal': 'Unknown'
-                }
             
             # Clean and store metadata
             paper.title = sanitize_text(metadata.get('title', paper.filename) or paper.filename)
