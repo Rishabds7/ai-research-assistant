@@ -164,6 +164,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 # (Middleware removed)
 
 # Celery Configuration
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 REDIS_URL = env('REDIS_URL', default='redis://redis:6379/0')
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
