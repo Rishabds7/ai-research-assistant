@@ -439,7 +439,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                             {/* eslint-disable-next-line */}
                             <Button
                                 onClick={handleAnalyzeGaps}
-                                disabled={!!gapAnalysisTaskId || !selectedCollection.papers || selectedCollection.papers.length < 2}
+                                disabled={!!gapAnalysisTaskId || (!selectedCollection.papers && (selectedCollection.paper_count || 0) < 2) || (selectedCollection.papers && selectedCollection.papers.length < 2)}
                                 className="w-full bg-linear-to-r from-[#1A365D] to-[#2A4A7D] hover:from-[#0F172A] hover:to-[#1A365D] text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {gapAnalysisTaskId ? (
@@ -449,7 +449,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                                 )}
                                 {gapAnalysisTaskId
                                     ? 'Analyzing Research Gaps...'
-                                    : (!selectedCollection.papers || selectedCollection.papers.length < 2)
+                                    : ((selectedCollection.papers && selectedCollection.papers.length < 2) || (!selectedCollection.papers && (selectedCollection.paper_count || 0) < 2))
                                         ? 'Add at least 2 papers to analyze'
                                         : 'Analyze Research Gaps'
                                 }
@@ -465,7 +465,7 @@ export function CollectionsTab({ papers, onUpdate }: CollectionsTabProps) {
                             )}
 
                             {/* Gap Analysis Results - Only show if we have 2+ papers */}
-                            {selectedCollection.gap_analysis && selectedCollection.papers && selectedCollection.papers.length >= 2 && (
+                            {selectedCollection.gap_analysis && ((selectedCollection.papers && selectedCollection.papers.length >= 2) || (!selectedCollection.papers && (selectedCollection.paper_count || 0) >= 2)) && (
                                 <div className="mt-4">
                                     {/* eslint-disable-next-line */}
                                     <button

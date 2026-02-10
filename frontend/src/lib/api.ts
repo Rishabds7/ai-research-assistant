@@ -22,8 +22,11 @@ export const api = axios.create({
 export const getMediaUrl = (path: string): string => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    const baseUrl = API_URL.replace('/api', '');
-    return `${baseUrl}${path}`;
+
+    const baseUrl = API_URL.replace(/\/api\/?$/, '');
+    // Ensure path starts with a slash
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${baseUrl}${normalizedPath}`;
 };
 
 // Helper to get or create a persistent session ID

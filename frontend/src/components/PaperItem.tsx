@@ -303,7 +303,7 @@ export function PaperItem({ paper, onUpdate }: PaperItemProps) {
                                     <span>Rejected: Non-Academic Content</span>
                                 </div>
                             ) : (
-                                <CardTitle className="text-xl font-extrabold text-[#1A365D] tracking-tight leading-tight group-hover:text-[#D4AF37] transition-colors line-clamp-2 break-words" title={paper.filename}>
+                                <CardTitle className="text-xl font-extrabold text-[#1A365D] tracking-tight leading-tight group-hover:text-[#D4AF37] transition-colors line-clamp-2 wrap-break-word" title={paper.filename}>
                                     {paper.filename}
                                 </CardTitle>
                             )}
