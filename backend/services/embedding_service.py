@@ -37,7 +37,8 @@ class EmbeddingService:
             logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
         # Default to the most stable model as of Feb 2026
-        self.model_name = "models/gemini-embedding-001"
+        # We use text-embedding-004 because it supports setting output_dimensionality
+        self.model_name = "models/text-embedding-004"
         self._model_confirmed = False
 
     def _ensure_model(self) -> None:
@@ -51,13 +52,23 @@ class EmbeddingService:
         test_text = "test"
         # Only use 768-dimension models (text-embedding-004 returns 3072 dims - incompatible!)
         models_to_try = [
-            "models/gemini-embedding-001", # Priority 1 (768 dims)
-            "models/embedding-001"         # Priority 2 (768 dims)
+            "models/text-embedding-004", # Priority 1 (Supports output_dimensionality=768)
+            "models/gemini-embedding-001", # Priority 2 (Native 768 dims)
+            "models/embedding-001"         # Priority 3 (Legacy)
         ]
         
         for model in models_to_try:
             try:
-                genai.embed_content(model=model, content=test_text, task_type="retrieval_document")
+                # Test with output_dimensionality if it's text-embedding-004
+                if "text-embedding-004" in model:
+                    genai.embed_content(
+                        model=model, 
+                        content=test_text, 
+                        task_type="retrieval_document",
+                        output_dimensionality=768
+                    )
+                else:
+                    genai.embed_content(model=model, content=test_text, task_type="retrieval_document")
                 self.model_name = model
                 self._model_confirmed = True
                 logger.info(f"EMBEDDING: Confirmed working model: {model}")
@@ -82,13 +93,26 @@ class EmbeddingService:
         self._ensure_model()
         
         try:
-            result = genai.embed_content(
-                model=self.model_name,
-                content=text,
-                task_type="retrieval_document",
-                title="Research Paper Chunk"
-            )
-            return result['embedding']
+            # Prepare kwargs - add dimensionality for new models
+            kwargs = {
+                "model": self.model_name,
+                "content": text,
+                "task_type": "retrieval_document",
+                "title": "Research Paper Chunk"
+            }
+            
+            if "text-embedding-004" in self.model_name:
+                kwargs["output_dimensionality"] = 768
+
+            result = genai.embed_content(**kwargs)
+            
+            # Validation check
+            embedding = result['embedding']
+            if len(embedding) != 768:
+                logger.warning(f"EMBEDDING MISMATCH: Got {len(embedding)} dims, expected 768. Truncating.")
+                embedding = embedding[:768]
+                
+            return embedding
         except Exception as e:
             logger.error(f"Google Embedding Error (model {self.model_name}): {e}")
             # Final desperate fallback attempt
@@ -151,13 +175,22 @@ class EmbeddingService:
             
             try:
                 # Use batch_embed_contents for massive speedup
-                result = genai.embed_content(
-                    model=self.model_name,
-                    content=batch_texts,
-                    task_type="retrieval_document"
-                )
+                kwargs = {
+                    "model": self.model_name,
+                    "content": batch_texts,
+                    "task_type": "retrieval_document"
+                }
+                
+                if "text-embedding-004" in self.model_name:
+                    kwargs["output_dimensionality"] = 768
+
+                result = genai.embed_content(**kwargs)
                 
                 for idx, vec in enumerate(result['embedding']):
+                    if len(vec) != 768:
+                        logger.warning(f"Batch embedding dimension mismatch: {len(vec)}. Skipping.")
+                        continue
+                        
                     embeddings_to_create.append(
                         EmbeddingModel(
                             paper=paper_instance,

@@ -97,9 +97,16 @@ def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
         processor = PDFProcessor()
         
         # Extract Text
-        text = processor.extract_text(paper.file.path)
-        if not text or len(text.strip()) < 100:
-            error_msg = 'Failed to extract meaningful text from PDF.'
+        try:
+            text = processor.extract_text(paper.file.path)
+            if not text or len(text.strip()) < 100:
+                error_msg = 'Failed to extract meaningful text from PDF.'
+                update_task_status(task_id, 'failed', error=error_msg)
+                return {'error': error_msg}
+        except (ValueError, FileNotFoundError) as e:
+            # Handle Render/Heroku Ephemeral Filesystem issue
+            error_msg = f"PDF file not found (Ephemeral Storage): {e}"
+            logger.error(error_msg)
             update_task_status(task_id, 'failed', error=error_msg)
             return {'error': error_msg}
         
