@@ -37,9 +37,8 @@ class EmbeddingService:
         if not settings.GEMINI_API_KEY:
             logger.error("CRITICAL: GEMINI_API_KEY is missing! Check your environment variables.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        # Default to the most stable model as of Feb 2026
-        # We use text-embedding-004 because it supports setting output_dimensionality
-        self.model_name = "models/text-embedding-004"
+        # Use gemini-embedding-001 which natively produces 768 dimensions
+        self.model_name = "models/gemini-embedding-001"
         self._model_confirmed = False
 
     def _ensure_model(self) -> None:
@@ -51,36 +50,26 @@ class EmbeddingService:
             return
 
         test_text = "test"
-        # Use 768-dimension models for optimal performance
+        # Use gemini-embedding-001 for native 768-dim output (no truncation needed)
         models_to_try = [
-            "models/text-embedding-004", # Priority 1 (Supports 768 dims)
-            "models/gemini-embedding-001", # Priority 2 (Native 768 dims)
-            "models/embedding-001"         # Priority 3 (Legacy)
+            "models/gemini-embedding-001", # Priority 1 (Native 768 dims)
+            "models/embedding-001"         # Priority 2 (Legacy)
         ]
         
         for model in models_to_try:
             try:
-                # Force 768 dimensions for all models
+                # No output_dimensionality needed - native 768
                 genai.embed_content(
                     model=model, 
                     content=test_text, 
-                    task_type="retrieval_document",
-                    output_dimensionality=768
+                    task_type="retrieval_document"
                 )
                 self.model_name = model
                 self._model_confirmed = True
-                logger.info(f"EMBEDDING: Confirmed working model: {model} (Force 768 Dims)")
+                logger.info(f"EMBEDDING: Confirmed working model: {model} (Native 768 Dims)")
                 return
             except Exception:
-                try:
-                    # Fallback for models that don't support output_dimensionality
-                    genai.embed_content(model=model, content=test_text, task_type="retrieval_document")
-                    self.model_name = model
-                    self._model_confirmed = True
-                    logger.info(f"EMBEDDING: Confirmed working model: {model} (Native Dims)")
-                    return
-                except Exception:
-                    continue
+                continue
         
     def generate_embedding(self, text: str) -> List[float]:
         """
@@ -104,8 +93,8 @@ class EmbeddingService:
                 "model": self.model_name,
                 "content": text,
                 "task_type": "retrieval_document",
-                "title": "Research Paper Chunk",
-                "output_dimensionality": 768 # Force 768
+                "title": "Research Paper Chunk"
+                # No output_dimensionality - gemini-embedding-001 is native 768
             }
 
             result = genai.embed_content(**kwargs)
@@ -265,8 +254,7 @@ class EmbeddingService:
                     "task_type": "retrieval_document"
                 }
                 
-                if "text-embedding-004" in self.model_name:
-                    kwargs["output_dimensionality"] = 768
+                # No output_dimensionality needed for gemini-embedding-001
 
                 result = genai.embed_content(**kwargs)
                 
@@ -325,8 +313,8 @@ class EmbeddingService:
             result = genai.embed_content(
                 model=self.model_name,
                 content=query,
-                task_type="retrieval_query",
-                output_dimensionality=768 # Force 768 for search too
+                task_type="retrieval_query"
+                # No output_dimensionality - native 768
             )
             query_vec = result['embedding']
             if len(query_vec) != 768:

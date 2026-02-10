@@ -392,13 +392,17 @@ class GeminiLLMService:
             model_name=GEMINI_MODEL,
             generation_config={"temperature": 0.1}
         )
-        logger.info("="*80)
-        logger.info("🤖 LLM SERVICE INITIALIZATION")
-        logger.info(f"   Provider: GEMINI")
-        logger.info(f"   Model: {GEMINI_MODEL}")
-        logger.info(f"   Mode: CLOUD (Google Gemini API)")
-        logger.info(f"LLM: Initialized Gemini service (Pro: {GEMINI_MODEL}, Flash: gemini-1.5-flash)")
-        logger.info("="*80)
+        
+        # FLASH MODEL for fast-path tasks (Metadata, Datasets, Licenses)
+        try:
+            self.flash_model = genai.GenerativeModel(
+                model_name="gemini-2.0-flash",
+                generation_config={"temperature": 0.1}
+            )
+            logger.info(f"LLM: Initialized Gemini service (Pro: {GEMINI_MODEL}, Flash: gemini-2.0-flash)")
+        except Exception as e:
+            logger.warning(f"Flash model unavailable: {e}. Using Pro for all tasks.")
+            self.flash_model = None
 
     def _generate(self, prompt: str, **kwargs) -> Optional[str]:
         """
@@ -417,7 +421,9 @@ class GeminiLLMService:
 
         for attempt in range(max_retries + 1):
             try:
-                response = self.model.generate_content(prompt)
+                # Use flash model for fast tasks if available
+                active_model = self.flash_model if (kwargs.get('use_flash') and self.flash_model) else self.model
+                response = active_model.generate_content(prompt)
                 if response.candidates and response.candidates[0].content.parts:
                     return response.text
                 return "" # Return empty string if swift safety filter blocks it, but not None
