@@ -421,10 +421,14 @@ Return format: ["license1", "license2"]"""
         # Execute LLM call
         if llm.__class__.__name__ == 'GeminiLLMService':
             # Gemini
+            logger.info(f"Generating metadata for {field} using Gemini...")
             response = llm._generate(prompt)
+            logger.info(f"Gemini Raw Response for {field}: {response}")
+            
             from services.llm_service import _parse_json_safe
             response_text = response if response else ""
             result = _parse_json_safe(response_text, ["None mentioned"])
+            logger.info(f"Parsed Result for {field}: {result}")
         elif llm.__class__.__name__ == 'OllamaLLMService':
             # Ollama
             response_text = llm._generate(prompt, json_mode=True)
