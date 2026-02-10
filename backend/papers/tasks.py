@@ -129,21 +129,15 @@ def process_pdf_task(self, paper_id: str) -> Dict[str, str]:
         paper.processed = True
         paper.save()
         
-        # 5. Trigger Async AI Tasks (Deep Analysis) IN PARALLEL
-        # We start EVERYTHING immediately so it's ready by the time user clicks
+        # 5. Trigger ONLY Essential Background AI Tasks
+        # Title/Authors extraction: Needed for immediate card display
+        # Embeddings: Needed for RAG functionality
+        # NOTE: Summarization, Datasets, and Licenses are now USER-TRIGGERED (button clicks only)
         details_task = identify_paper_details_task.delay(paper_id)
         embed_task = generate_embeddings_task.delay(paper_id)
-        summarize_task = extract_all_sections_task.delay(paper_id)
-        
-        # Also trigger fast metadata (datasets/licenses) automatically
-        ds_task = extract_metadata_task.delay(paper_id, 'datasets')
-        lic_task = extract_metadata_task.delay(paper_id, 'licenses')
         
         paper.task_ids['identify_details'] = details_task.id
         paper.task_ids['generate_embeddings'] = embed_task.id
-        paper.task_ids['summarize'] = summarize_task.id
-        paper.task_ids['datasets'] = ds_task.id
-        paper.task_ids['licenses'] = lic_task.id
         
         paper.save(update_fields=['task_ids'])
         

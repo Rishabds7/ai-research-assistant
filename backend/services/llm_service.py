@@ -138,19 +138,27 @@ def _parse_json_safe(raw: str, default: Any = None) -> Any:
         raise ValueError(f"Failed to parse JSON despite recovery: {e}") from e
 
 
-def clean_llm_summary(text: str) -> str:
+def clean_llm_summary(text: Union[str, List[str]]) -> str:
     """
     Aggressively removes intro/outro meta-text from the LLM. 
     Also normalizes content by merging wrapped lines and removing leading bullets.
     
     Args:
-        text: Raw summary text from LLM.
+        text: Raw summary text from LLM (string or list of strings).
         
     Returns:
         str: Cleaned, bulleted text.
     """
     if not text:
         return ""
+    
+    # Handle list inputs (sometimes LLM returns bullet points as a list)
+    if isinstance(text, list):
+        text = '\n'.join(str(item) for item in text)
+    
+    # Ensure we have a string
+    if not isinstance(text, str):
+        text = str(text)
         
     lines = text.split('\n')
     processed_points = []
@@ -384,13 +392,13 @@ class GeminiLLMService:
             model_name=GEMINI_MODEL,
             generation_config={"temperature": 0.1}
         )
-        # INITIALIZE FLASH MODEL for "Fast-Path" tasks (Metadata, Datasets, Licenses)
-        # Flash is ~3-4x faster and has much higher rate limits.
-        self.flash_model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            generation_config={"temperature": 0.1}
-        )
+        logger.info("="*80)
+        logger.info("🤖 LLM SERVICE INITIALIZATION")
+        logger.info(f"   Provider: GEMINI")
+        logger.info(f"   Model: {GEMINI_MODEL}")
+        logger.info(f"   Mode: CLOUD (Google Gemini API)")
         logger.info(f"LLM: Initialized Gemini service (Pro: {GEMINI_MODEL}, Flash: gemini-1.5-flash)")
+        logger.info("="*80)
 
     def _generate(self, prompt: str, **kwargs) -> Optional[str]:
         """
@@ -409,9 +417,7 @@ class GeminiLLMService:
 
         for attempt in range(max_retries + 1):
             try:
-                # Optional: use_flash override
-                active_model = getattr(self, 'flash_model', self.model) if kwargs.get('use_flash') else self.model
-                response = active_model.generate_content(prompt)
+                response = self.model.generate_content(prompt)
                 if response.candidates and response.candidates[0].content.parts:
                     return response.text
                 return "" # Return empty string if swift safety filter blocks it, but not None
@@ -474,7 +480,7 @@ Return ONLY a JSON object with this exact structure:
 
 Text:
 """ + context[:15000]
-        raw = self._generate(prompt, use_flash=True)
+        raw = self._generate(prompt)
         return _parse_json_safe(raw, {
             "title": "Unknown", 
             "authors": ["Unknown"], 
@@ -512,7 +518,7 @@ Rules:
 
 Snippets:
 """ + snippets_text
-        raw = self._generate(prompt, use_flash=True)
+        raw = self._generate(prompt)
         result = _parse_json_safe(raw, ["None mentioned"])
         return result if result else ["None mentioned"]
     
