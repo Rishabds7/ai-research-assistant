@@ -24,8 +24,11 @@ export const getMediaUrl = (path: string): string => {
     if (path.startsWith('http')) return path;
 
     const baseUrl = API_URL.replace(/\/api\/?$/, '');
-    // Ensure path starts with a slash
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    // Ensure path includes /media/ prefix (Django FileField returns relative paths like 'papers/...')
+    let normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    if (!normalizedPath.startsWith('/media/')) {
+        normalizedPath = `/media${normalizedPath}`;
+    }
     return `${baseUrl}${normalizedPath}`;
 };
 
