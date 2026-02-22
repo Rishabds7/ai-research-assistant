@@ -23,13 +23,15 @@ export const getMediaUrl = (path: string): string => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
 
-    const baseUrl = API_URL.replace(/\/api\/?$/, '');
-    // Ensure path includes /media/ prefix (Django FileField returns relative paths like 'papers/...')
+    // Use a relative path to leverage Next.js rewrites and avoid host confusion.
+    // The browser will hit http://localhost:3000/media/... and Next.js will proxy it to the backend.
     let normalizedPath = path.startsWith('/') ? path : `/${path}`;
     if (!normalizedPath.startsWith('/media/')) {
         normalizedPath = `/media${normalizedPath}`;
     }
-    return `${baseUrl}${normalizedPath}`;
+
+    // Encode the URI to handle spaces and special characters in filenames
+    return encodeURI(normalizedPath);
 };
 
 // Helper to get or create a persistent session ID
